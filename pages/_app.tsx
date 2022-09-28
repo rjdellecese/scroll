@@ -10,7 +10,6 @@ function MyApp({ Component, pageProps }: AppProps) {
     <ConvexProvider client={convex}>
       <Component {...pageProps} />
     </ConvexProvider>
-
   );
 }
 
