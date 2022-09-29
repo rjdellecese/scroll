@@ -9,6 +9,10 @@
  * @module
  */
 
+import type createNote from "../createNote";
+import type getNote from "../getNote";
+import type getStepsSince from "../getStepsSince";
+import type updateNote from "../updateNote";
 import type { OptimisticLocalStore as GenericOptimisticLocalStore } from "convex/browser";
 import type { ClientMutation, ClientQuery } from "convex/server";
 
@@ -22,8 +26,14 @@ import type { ClientMutation, ClientQuery } from "convex/server";
  * `ConvexReactClient` to create app-specific types.
  */
 export type ConvexAPI = {
-  queries: {};
-  mutations: {};
+  queries: {
+    getNote: ClientQuery<typeof getNote>;
+    getStepsSince: ClientQuery<typeof getStepsSince>;
+  };
+  mutations: {
+    createNote: ClientMutation<typeof createNote>;
+    updateNote: ClientMutation<typeof updateNote>;
+  };
 };
 
 import { makeUseQuery, makeUseMutation, makeUseConvex } from "convex/react";

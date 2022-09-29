@@ -1,8 +1,22 @@
-import type { NextPage } from 'next'
-import Head from 'next/head'
-import Editor from '../components/Editor'
+import type { NextPage } from "next";
+import Head from "next/head";
+import { match, P } from "ts-pattern";
+import Editor from "../components/Editor";
+import { Document } from "../convex/_generated/dataModel";
+import { useMutation, useQuery } from "../convex/_generated/react";
 
 const Home: NextPage = () => {
+  const note = useQuery("getNote");
+
+  const createNote = useMutation("createNote");
+  const handleCreateNote = async () => await createNote();
+
+  const editor = match(note)
+    .with(null, () => <button onClick={handleCreateNote}>Create note</button>)
+    .with(undefined, () => <span>Loading…</span>)
+    .with(P.any, (note_: Document<"notes">) => <Editor note={note_} />)
+    .exhaustive();
+
   return (
     <div>
       <Head>
@@ -11,11 +25,9 @@ const Home: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main>
-        <Editor />
-      </main>
+      <main>{editor}</main>
     </div>
-  )
-}
+  );
+};
 
-export default Home
+export default Home;

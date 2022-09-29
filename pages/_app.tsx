@@ -5,7 +5,7 @@ import clientConfig from "../convex/_generated/clientConfig";
 
 const convex = new ConvexReactClient(clientConfig);
 
-function MyApp({ Component, pageProps }: AppProps) {
+function ForeverNote({ Component, pageProps }: AppProps) {
   return (
     <ConvexProvider client={convex}>
       <Component {...pageProps} />
@@ -13,4 +13,4 @@ function MyApp({ Component, pageProps }: AppProps) {
   );
 }
 
-export default MyApp;
+export default ForeverNote;
