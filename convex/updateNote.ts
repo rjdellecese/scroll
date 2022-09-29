@@ -1,3 +1,4 @@
+import Underline from "@tiptap/extension-underline";
 import { getSchema } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { array, either } from "fp-ts";
@@ -40,7 +41,7 @@ export default mutation(
         return;
       }
 
-      const schema = getSchema([StarterKit]);
+      const schema = getSchema([StarterKit, Underline]);
 
       const doc = JSON.parse(note.doc);
       const doc_ = Node.fromJSON(schema, doc);

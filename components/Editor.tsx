@@ -1,4 +1,5 @@
 import Placeholder from "@tiptap/extension-placeholder";
+import Underline from "@tiptap/extension-underline";
 import { useEditor, EditorContent, Extension } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { array, either, readonlyArray } from "fp-ts";
@@ -32,6 +33,7 @@ const Editor = (props: {
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Underline,
       Extension.create({
         addProseMirrorPlugins: () => [
           collab.collab({ version: props.persistedVersion }),
