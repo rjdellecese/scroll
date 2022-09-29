@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tiptap/extension-placeholder": "^2.0.0-beta.198",
     "@tiptap/react": "^2.0.0-beta.197",
     "@tiptap/starter-kit": "^2.0.0-beta.197",
     "convex": "^0.1.10",

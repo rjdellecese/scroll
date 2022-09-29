@@ -1,3 +1,4 @@
+import Placeholder from "@tiptap/extension-placeholder";
 import { useEditor, EditorContent, Extension } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { array, either, readonlyArray } from "fp-ts";
@@ -36,8 +37,18 @@ const Editor = (props: {
           collab.collab({ version: props.persistedVersion }),
         ],
       }),
+      Placeholder.configure({
+        placeholder: "Write something…",
+        emptyNodeClass:
+          "first:before:h-0 first:before:text-gray-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none",
+      }),
     ],
     content,
+    editorProps: {
+      attributes: {
+        class: "h-screen w-screen cursor-text p-5 focus:outline-none",
+      },
+    },
     onTransaction(props) {
       const sendableSteps = collab.sendableSteps(props.editor.state);
       console.log("sendableSteps", sendableSteps);
@@ -78,7 +89,7 @@ const Editor = (props: {
     }
   }, [editor, stepsSince]);
 
-  return <EditorContent editor={editor} className="grid place-items-center" />;
+  return <EditorContent editor={editor} />;
 };
 
 export default Editor;
