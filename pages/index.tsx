@@ -14,7 +14,9 @@ const Home: NextPage = () => {
   const editor = match(note)
     .with(null, () => <button onClick={handleCreateNote}>Create note</button>)
     .with(undefined, () => <span>Loading…</span>)
-    .with(P.any, (note_: Document<"notes">) => <Editor note={note_} />)
+    .with(P.any, (note_: { doc: Document<"note">["doc"]; version: number }) => (
+      <Editor doc={note_.doc} persistedVersion={note_.version} />
+    ))
     .exhaustive();
 
   return (
@@ -25,7 +27,7 @@ const Home: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main>{editor}</main>
+      <main className="prose prose-stone">{editor}</main>
     </div>
   );
 };

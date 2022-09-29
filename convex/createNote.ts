@@ -1,12 +1,10 @@
 import { mutation } from "./_generated/server";
 
 export default mutation(async ({ db }) => {
-  const note = await db.table("notes").first();
+  const note = await db.table("note").first();
   if (note === null) {
-    db.insert("notes", {
+    db.insert("note", {
       doc: '{ "type": "doc", "content": [] }',
-      steps: [],
-      stepClientIds: [],
     });
     console.log("Created note.");
   } else {

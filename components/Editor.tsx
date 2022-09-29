@@ -1,20 +1,21 @@
 import { useEditor, EditorContent, Extension } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { array, boolean, either, readonlyArray } from "fp-ts";
+import { array, either, readonlyArray } from "fp-ts";
 import { identity, pipe } from "fp-ts/lib/function";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { match, P } from "ts-pattern";
 import { Document } from "../convex/_generated/dataModel";
 import { useMutation, useQuery } from "../convex/_generated/react";
 
-const Editor = (props: { note: Document<"notes"> }) => {
-  const note = props.note;
-
+const Editor = (props: {
+  doc: Document<"note">["doc"];
+  persistedVersion: number;
+}) => {
   const content = pipe(
     either.tryCatch(
-      () => JSON.parse(note.doc),
+      () => JSON.parse(props.doc),
       () => "<p>Hello world</p>"
     ),
     either.matchW(identity, identity)
@@ -32,7 +33,7 @@ const Editor = (props: { note: Document<"notes"> }) => {
       StarterKit,
       Extension.create({
         addProseMirrorPlugins: () => [
-          collab.collab({ version: note.steps.length }),
+          collab.collab({ version: props.persistedVersion }),
         ],
       }),
     ],
@@ -59,7 +60,7 @@ const Editor = (props: { note: Document<"notes"> }) => {
 
   const stepsSince = useQuery(
     "getStepsSince",
-    editor ? collab.getVersion(editor.state) : note.steps.length
+    editor ? collab.getVersion(editor.state) : props.persistedVersion
   );
 
   useEffect(() => {
@@ -70,12 +71,14 @@ const Editor = (props: { note: Document<"notes"> }) => {
       )(stepsSince.steps);
 
       editor.view.dispatch(
-        collab.receiveTransaction(editor.state, steps, stepsSince.clientIds)
+        collab.receiveTransaction(editor.state, steps, stepsSince.clientIds, {
+          mapSelectionBackward: true,
+        })
       );
     }
   }, [editor, stepsSince]);
 
-  return <EditorContent editor={editor} />;
+  return <EditorContent editor={editor} className="grid place-items-center" />;
 };
 
 export default Editor;

@@ -1,9 +1,13 @@
 import { defineSchema, defineTable, s } from "convex/schema";
 
 export default defineSchema({
-  notes: defineTable({
+  note: defineTable({
     doc: s.string(),
-    steps: s.array(s.string()),
-    stepClientIds: s.array(s.string()),
+  }),
+  step: defineTable({
+    noteId: s.id("note"),
+    position: s.number(),
+    step: s.string(),
+    clientId: s.string(),
   }),
 });

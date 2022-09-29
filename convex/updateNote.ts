@@ -13,16 +13,29 @@ export default mutation(
     console.log("version", version);
     console.log("steps", steps.length);
 
-    const note = await db.table("notes").first();
+    const note = await db.table("note").first();
     if (note === null) {
-      db.insert("notes", {
+      db.insert("note", {
         doc: "",
-        steps: [],
-        stepClientIds: [],
       });
       console.log("Created note.");
     } else {
-      if (version !== note.steps.length) {
+      const stepsQuery = db
+        .table("step")
+        .filter((q) => q.eq(q.field("noteId"), note._id));
+
+      // TODO
+      const getVersion = async () => {
+        let versionCounter = 0;
+        for await (const _step of stepsQuery) {
+          versionCounter += 1;
+        }
+        return versionCounter;
+      };
+
+      const persistedVersion = await getVersion();
+
+      if (version !== persistedVersion) {
         console.log("Versions are not equal.");
         return;
       }
@@ -52,15 +65,21 @@ export default mutation(
         ),
         (updatedDoc) => ({
           doc: JSON.stringify(updatedDoc.toJSON()),
-          steps: pipe(note.steps, array.concat(steps)),
-          stepClientIds: pipe(
-            note.stepClientIds,
-            array.concat(array.replicate(steps.length, clientId))
-          ),
         })
       );
 
       db.replace(note._id, updatedNote);
+
+      array.reduce(version, (currentVersion: number, step: string) => {
+        const nextVersion = currentVersion + 1;
+        db.insert("step", {
+          noteId: note._id,
+          step: step,
+          clientId: clientId,
+          position: nextVersion,
+        });
+        return nextVersion;
+      })(steps);
     }
   }
 );
