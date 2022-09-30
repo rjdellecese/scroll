@@ -29,6 +29,7 @@ export default mutation(
         return;
       }
 
+      // TODO: Extract and share b/w React and Convex
       const schema = getSchema([StarterKit, Underline]);
 
       const doc = JSON.parse(note.doc);

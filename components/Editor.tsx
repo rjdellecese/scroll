@@ -1,12 +1,13 @@
 import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
+import { Editor as TiptapEditor } from "@tiptap/core";
 import { useEditor, EditorContent, Extension } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { array, either, readonlyArray } from "fp-ts";
-import { identity, pipe } from "fp-ts/lib/function";
+import { array, either, option, readonlyArray } from "fp-ts";
+import { constVoid, identity, pipe } from "fp-ts/lib/function";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
-import { useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { match, P } from "ts-pattern";
 import { Document } from "../convex/_generated/dataModel";
 import { useMutation, useQuery } from "../convex/_generated/react";
@@ -23,13 +24,11 @@ const Editor = (props: {
     either.matchW(identity, identity)
   );
 
-  const [sendableSteps, setSendableSteps] =
-    useState<ReturnType<typeof collab.sendableSteps>>(null);
-
   const updateNote = useMutation("api/updateNote");
-  const handleOnUpdate = (
-    sendableSteps: ReturnType<typeof collab.sendableSteps>
-  ) => setSendableSteps(sendableSteps);
+
+  const [isUpdatingNote, setIsUpdatingNote] = useState(false);
+  const isUpdatingNoteRef = useRef(isUpdatingNote);
+  isUpdatingNoteRef.current = isUpdatingNote;
 
   const editor = useEditor({
     extensions: [
@@ -53,26 +52,25 @@ const Editor = (props: {
       },
     },
     onTransaction(props) {
-      handleOnUpdate(collab.sendableSteps(props.editor.state));
+      maybeSendSendableSteps(
+        { isUpdatingNote: isUpdatingNoteRef.current },
+        updateNote,
+        setIsUpdatingNote,
+        props.editor
+      );
     },
   });
 
   useEffect(() => {
-    if (sendableSteps) {
-      updateNote(
-        match(sendableSteps.clientID)
-          .with(P.number, (clientId) => clientId.toString())
-          .with(P.string, identity)
-          .exhaustive(),
-        sendableSteps.version,
-        pipe(
-          sendableSteps.steps,
-          readonlyArray.toArray,
-          array.map((step: Step) => JSON.stringify(step.toJSON()))
-        )
+    if (editor) {
+      maybeSendSendableSteps(
+        { isUpdatingNote },
+        updateNote,
+        setIsUpdatingNote,
+        editor
       );
     }
-  }, [updateNote, sendableSteps]);
+  }, [editor, isUpdatingNote, updateNote]);
 
   const stepsSince = useQuery(
     "api/getStepsSince",
@@ -96,5 +94,47 @@ const Editor = (props: {
 
   return <EditorContent editor={editor} />;
 };
+
+const sendSendableSteps = (
+  updateNote: ReturnType<typeof useMutation<"api/updateNote">>,
+  sendableSteps: NonNullable<ReturnType<typeof collab.sendableSteps>>
+): Promise<null> =>
+  updateNote(
+    match(sendableSteps.clientID)
+      .with(P.number, (clientId) => clientId.toString())
+      .with(P.string, identity)
+      .exhaustive(),
+    sendableSteps.version,
+    pipe(
+      sendableSteps.steps,
+      readonlyArray.toArray,
+      array.map((step: Step) => JSON.stringify(step.toJSON()))
+    )
+  );
+
+const maybeSendSendableSteps = (
+  {
+    isUpdatingNote,
+  }: {
+    isUpdatingNote: boolean;
+  },
+  updateNote: ReturnType<typeof useMutation<"api/updateNote">>,
+  setIsUpdatingNote: Dispatch<SetStateAction<boolean>>,
+  editor: TiptapEditor
+): void =>
+  match(isUpdatingNote)
+    .with(true, constVoid)
+    .with(false, () => {
+      match(option.fromNullable(collab.sendableSteps(editor.state)))
+        .with(option.none, constVoid)
+        .with({ _tag: "Some", value: P.select() }, (sendableSteps) => {
+          sendSendableSteps(updateNote, sendableSteps).then(() =>
+            setIsUpdatingNote(false)
+          );
+          setIsUpdatingNote(true);
+        })
+        .exhaustive();
+    })
+    .exhaustive();
 
 export default Editor;

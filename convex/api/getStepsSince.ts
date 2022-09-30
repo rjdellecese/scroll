@@ -12,6 +12,13 @@ export default query(
       throw Error;
     }
     console.log("Got the note");
+    // TODO
+    // const steps = await db
+    //   .table("step")
+    //   .index("by_note_id")
+    //   .range((q) => q.eq("noteId", note._id))
+    //   .filter((q) => q.gt(q.field("position"), version))
+    //   .collect();
     const steps = await db
       .table("step")
       .filter((q) =>
