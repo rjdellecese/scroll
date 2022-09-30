@@ -8,7 +8,6 @@ import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
 import { useEffect, useState } from "react";
 import { match, P } from "ts-pattern";
-import { useDebounce } from "usehooks-ts";
 import { Document } from "../convex/_generated/dataModel";
 import { useMutation, useQuery } from "../convex/_generated/react";
 
@@ -26,9 +25,6 @@ const Editor = (props: {
 
   const [sendableSteps, setSendableSteps] =
     useState<ReturnType<typeof collab.sendableSteps>>(null);
-  const debouncedSendableSteps = useDebounce<
-    ReturnType<typeof collab.sendableSteps>
-  >(sendableSteps, 200);
 
   const updateNote = useMutation("api/updateNote");
   const handleOnUpdate = (
@@ -62,22 +58,21 @@ const Editor = (props: {
   });
 
   useEffect(() => {
-    console.log("sendableSteps", debouncedSendableSteps);
-    if (debouncedSendableSteps) {
+    if (sendableSteps) {
       updateNote(
-        match(debouncedSendableSteps.clientID)
+        match(sendableSteps.clientID)
           .with(P.number, (clientId) => clientId.toString())
           .with(P.string, identity)
           .exhaustive(),
-        debouncedSendableSteps.version,
+        sendableSteps.version,
         pipe(
-          debouncedSendableSteps.steps,
+          sendableSteps.steps,
           readonlyArray.toArray,
           array.map((step: Step) => JSON.stringify(step.toJSON()))
         )
       );
     }
-  }, [updateNote, debouncedSendableSteps]);
+  }, [updateNote, sendableSteps]);
 
   const stepsSince = useQuery(
     "api/getStepsSince",
