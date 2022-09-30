@@ -6,7 +6,8 @@ import { Either } from "fp-ts/lib/Either";
 import { pipe, identity } from "fp-ts/lib/function";
 import { Node } from "prosemirror-model";
 import { Step } from "prosemirror-transform";
-import { mutation } from "./_generated/server";
+import { getVersion } from "../getVersion";
+import { mutation } from "../_generated/server";
 
 export default mutation(
   async ({ db }, clientId: string, version: number, steps: string[]) => {
@@ -21,20 +22,7 @@ export default mutation(
       });
       console.log("Created note.");
     } else {
-      const stepsQuery = db
-        .table("step")
-        .filter((q) => q.eq(q.field("noteId"), note._id));
-
-      // TODO
-      const getVersion = async () => {
-        let versionCounter = 0;
-        for await (const _step of stepsQuery) {
-          versionCounter += 1;
-        }
-        return versionCounter;
-      };
-
-      const persistedVersion = await getVersion();
+      const persistedVersion = await getVersion(db, note._id);
 
       if (version !== persistedVersion) {
         console.log("Versions are not equal.");

@@ -1,6 +1,6 @@
 import { array } from "fp-ts";
-import { Document } from "./_generated/dataModel";
-import { query } from "./_generated/server";
+import { Document } from "../_generated/dataModel";
+import { query } from "../_generated/server";
 
 export default query(
   async (

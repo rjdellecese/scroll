@@ -6,9 +6,9 @@ import { Document } from "../convex/_generated/dataModel";
 import { useMutation, useQuery } from "../convex/_generated/react";
 
 const Home: NextPage = () => {
-  const note = useQuery("getNote");
+  const note = useQuery("api/getNote");
 
-  const createNote = useMutation("createNote");
+  const createNote = useMutation("api/createNote");
   const handleCreateNote = async () => await createNote();
 
   const editor = match(note)

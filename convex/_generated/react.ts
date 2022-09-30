@@ -9,10 +9,10 @@
  * @module
  */
 
-import type createNote from "../createNote";
-import type getNote from "../getNote";
-import type getStepsSince from "../getStepsSince";
-import type updateNote from "../updateNote";
+import type api_createNote from "../api/createNote";
+import type api_getNote from "../api/getNote";
+import type api_getStepsSince from "../api/getStepsSince";
+import type api_updateNote from "../api/updateNote";
 import type { OptimisticLocalStore as GenericOptimisticLocalStore } from "convex/browser";
 import type { ClientMutation, ClientQuery } from "convex/server";
 
@@ -27,12 +27,12 @@ import type { ClientMutation, ClientQuery } from "convex/server";
  */
 export type ConvexAPI = {
   queries: {
-    getNote: ClientQuery<typeof getNote>;
-    getStepsSince: ClientQuery<typeof getStepsSince>;
+    "api/getNote": ClientQuery<typeof api_getNote>;
+    "api/getStepsSince": ClientQuery<typeof api_getStepsSince>;
   };
   mutations: {
-    createNote: ClientMutation<typeof createNote>;
-    updateNote: ClientMutation<typeof updateNote>;
+    "api/createNote": ClientMutation<typeof api_createNote>;
+    "api/updateNote": ClientMutation<typeof api_updateNote>;
   };
 };
 

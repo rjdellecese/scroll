@@ -6,8 +6,9 @@ import { array, either, readonlyArray } from "fp-ts";
 import { identity, pipe } from "fp-ts/lib/function";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { match, P } from "ts-pattern";
+import { useDebounce } from "usehooks-ts";
 import { Document } from "../convex/_generated/dataModel";
 import { useMutation, useQuery } from "../convex/_generated/react";
 
@@ -23,12 +24,16 @@ const Editor = (props: {
     either.matchW(identity, identity)
   );
 
-  const updateNote = useMutation("updateNote");
-  const handleOnUpdate = async (
-    clientId: string,
-    version: number,
-    steps: string[]
-  ) => await updateNote(clientId, version, steps);
+  const [sendableSteps, setSendableSteps] =
+    useState<ReturnType<typeof collab.sendableSteps>>(null);
+  const debouncedSendableSteps = useDebounce<
+    ReturnType<typeof collab.sendableSteps>
+  >(sendableSteps, 200);
+
+  const updateNote = useMutation("api/updateNote");
+  const handleOnUpdate = (
+    sendableSteps: ReturnType<typeof collab.sendableSteps>
+  ) => setSendableSteps(sendableSteps);
 
   const editor = useEditor({
     extensions: [
@@ -52,27 +57,30 @@ const Editor = (props: {
       },
     },
     onTransaction(props) {
-      const sendableSteps = collab.sendableSteps(props.editor.state);
-      console.log("sendableSteps", sendableSteps);
-      if (sendableSteps) {
-        handleOnUpdate(
-          match(sendableSteps.clientID)
-            .with(P.number, (clientId) => clientId.toString())
-            .with(P.string, identity)
-            .exhaustive(),
-          sendableSteps.version,
-          pipe(
-            sendableSteps.steps,
-            readonlyArray.toArray,
-            array.map((step: Step) => JSON.stringify(step.toJSON()))
-          )
-        );
-      }
+      handleOnUpdate(collab.sendableSteps(props.editor.state));
     },
   });
 
+  useEffect(() => {
+    console.log("sendableSteps", debouncedSendableSteps);
+    if (debouncedSendableSteps) {
+      updateNote(
+        match(debouncedSendableSteps.clientID)
+          .with(P.number, (clientId) => clientId.toString())
+          .with(P.string, identity)
+          .exhaustive(),
+        debouncedSendableSteps.version,
+        pipe(
+          debouncedSendableSteps.steps,
+          readonlyArray.toArray,
+          array.map((step: Step) => JSON.stringify(step.toJSON()))
+        )
+      );
+    }
+  }, [updateNote, debouncedSendableSteps]);
+
   const stepsSince = useQuery(
-    "getStepsSince",
+    "api/getStepsSince",
     editor ? collab.getVersion(editor.state) : props.persistedVersion
   );
 
