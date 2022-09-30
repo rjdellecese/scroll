@@ -7,7 +7,8 @@ export const getVersion = async (
 ): Promise<number> => {
   const stepsQuery = db
     .table("step")
-    .filter((q) => q.eq(q.field("noteId"), noteId));
+    .index("by_note_id")
+    .range((q) => q.eq("noteId", noteId));
 
   const getVersion = async () => {
     let versionCounter = 0;
