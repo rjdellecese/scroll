@@ -11,6 +11,7 @@ import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { match, P } from "ts-pattern";
 import { Document } from "../convex/_generated/dataModel";
 import { useMutation, useQuery } from "../convex/_generated/react";
+import { nanoid } from "nanoid";
 
 const Editor = (props: {
   doc: Document<"note">["doc"];
@@ -26,6 +27,8 @@ const Editor = (props: {
 
   const updateNote = useMutation("api/updateNote");
 
+  const clientId = nanoid();
+
   const [isUpdatingNote, setIsUpdatingNote] = useState(false);
   const isUpdatingNoteRef = useRef(isUpdatingNote);
   isUpdatingNoteRef.current = isUpdatingNote;
@@ -36,7 +39,10 @@ const Editor = (props: {
       Underline,
       Extension.create({
         addProseMirrorPlugins: () => [
-          collab.collab({ version: props.persistedVersion }),
+          collab.collab({
+            version: props.persistedVersion,
+            clientID: clientId,
+          }),
         ],
       }),
       Placeholder.configure({
@@ -79,18 +85,30 @@ const Editor = (props: {
 
   useEffect(() => {
     console.log("stepsSince", stepsSince);
-    if (editor && stepsSince) {
-      const steps = array.map<string, Step>((step) =>
-        Step.fromJSON(editor.schema, JSON.parse(step))
-      )(stepsSince.steps);
+    match(option.fromNullable(editor))
+      .with(option.none, constVoid)
+      .with({ _tag: "Some", value: P.select() }, (editor_) =>
+        match(option.fromNullable(stepsSince))
+          .with(option.none, () => constVoid)
+          .with(
+            { _tag: "Some", value: { steps: [], clientIds: [] } },
+            constVoid
+          )
+          .with({ _tag: "Some", value: P.select() }, ({ steps, clientIds }) => {
+            const parsedSteps = array.map<string, Step>((step) =>
+              Step.fromJSON(editor_.schema, JSON.parse(step))
+            )(steps);
 
-      editor.view.dispatch(
-        collab.receiveTransaction(editor.state, steps, stepsSince.clientIds, {
-          mapSelectionBackward: true,
-        })
-      );
-    }
-  }, [editor, stepsSince]);
+            editor_.view.dispatch(
+              collab.receiveTransaction(editor_.state, parsedSteps, clientIds, {
+                mapSelectionBackward: true,
+              })
+            );
+          })
+          .exhaustive()
+      )
+      .exhaustive();
+  }, [editor, stepsSince, clientId]);
 
   return <EditorContent editor={editor} />;
 };
@@ -98,8 +116,9 @@ const Editor = (props: {
 const sendSendableSteps = (
   updateNote: ReturnType<typeof useMutation<"api/updateNote">>,
   sendableSteps: NonNullable<ReturnType<typeof collab.sendableSteps>>
-): Promise<null> =>
-  updateNote(
+): Promise<null> => {
+  console.log("sending sendableSteps");
+  return updateNote(
     match(sendableSteps.clientID)
       .with(P.number, (clientId) => clientId.toString())
       .with(P.string, identity)
@@ -111,6 +130,7 @@ const sendSendableSteps = (
       array.map((step: Step) => JSON.stringify(step.toJSON()))
     )
   );
+};
 
 const maybeSendSendableSteps = (
   {
@@ -121,13 +141,15 @@ const maybeSendSendableSteps = (
   updateNote: ReturnType<typeof useMutation<"api/updateNote">>,
   setIsUpdatingNote: Dispatch<SetStateAction<boolean>>,
   editor: TiptapEditor
-): void =>
+): void => {
+  console.log("maybeSendSendableSteps");
   match(isUpdatingNote)
     .with(true, constVoid)
     .with(false, () => {
       match(option.fromNullable(collab.sendableSteps(editor.state)))
         .with(option.none, constVoid)
         .with({ _tag: "Some", value: P.select() }, (sendableSteps) => {
+          console.log("actually send sendableSteps");
           sendSendableSteps(updateNote, sendableSteps).then(() =>
             setIsUpdatingNote(false)
           );
@@ -136,5 +158,6 @@ const maybeSendSendableSteps = (
         .exhaustive();
     })
     .exhaustive();
+};
 
 export default Editor;
