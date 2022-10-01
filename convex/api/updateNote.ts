@@ -10,9 +10,14 @@ import { getVersion } from "../getVersion";
 import { mutation } from "../_generated/server";
 
 export default mutation(
-  async ({ db }, clientId: string, version: number, steps: string[]) => {
+  async (
+    { db },
+    clientId: string,
+    clientPersistedVersion: number,
+    steps: string[]
+  ) => {
     console.log("clientId", clientId);
-    console.log("version", version);
+    console.log("clientPersistedVersion", clientPersistedVersion);
     console.log("steps", steps.length);
 
     const note = await db.table("note").first();
@@ -24,7 +29,7 @@ export default mutation(
     } else {
       const persistedVersion = await getVersion(db, note._id);
 
-      if (version !== persistedVersion) {
+      if (clientPersistedVersion !== persistedVersion) {
         console.log("Versions are not equal.");
         return;
       }
@@ -60,16 +65,19 @@ export default mutation(
 
       db.replace(note._id, updatedNote);
 
-      array.reduce(version, (currentVersion: number, step: string) => {
-        const nextVersion = currentVersion + 1;
-        db.insert("step", {
-          noteId: note._id,
-          step: step,
-          clientId: clientId,
-          position: nextVersion,
-        });
-        return nextVersion;
-      })(steps);
+      array.reduce(
+        clientPersistedVersion,
+        (currentVersion: number, step: string) => {
+          const nextVersion = currentVersion + 1;
+          db.insert("step", {
+            noteId: note._id,
+            step: step,
+            clientId: clientId,
+            position: nextVersion,
+          });
+          return nextVersion;
+        }
+      )(steps);
     }
   }
 );
