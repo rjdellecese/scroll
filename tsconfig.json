@@ -1,0 +1,12 @@
+{
+  "include": ["src/**/*", "./node_modules/@types/node/index.d.ts"],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "~*": ["./*"]
+    },
+    "isolatedModules": true,
+    "jsx": "react"
+  },
+  "extends": "@tsconfig/recommended/tsconfig.json"
+}

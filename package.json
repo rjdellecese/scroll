@@ -1,0 +1,29 @@
+{
+  "name": "forever-note",
+  "private": "true",
+  "scripts": {
+    "start": "parcel src/index.html",
+    "build": "parcel build index.html",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Forever-Note/forever-note.git"
+  },
+  "devDependencies": {
+    "@parcel/validator-typescript": "^2.7.0",
+    "@tsconfig/recommended": "^1.0.1",
+    "@types/node": "^18.8.2",
+    "@types/react-dom": "^18.0.6",
+    "parcel": "^2.7.0",
+    "process": "^0.11.10",
+    "typescript": "^4.8.4"
+  },
+  "dependencies": {
+    "elm-ts": "^0.6.0",
+    "fp-ts": "^2.12.3",
+    "react": "^16.14.0",
+    "react-dom": "^16.x",
+    "rxjs": "^6.6.7"
+  }
+}
