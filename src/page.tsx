@@ -1,9 +1,8 @@
 import * as React from "react";
-import type { ReactNode } from "react";
 import { cmd, html } from "elm-ts";
-import { Location, push } from "elm-ts/lib/Navigation";
-import { Dom, Html } from "elm-ts/lib/React";
-import * as main from "~src/main";
+import { Location } from "elm-ts/lib/Navigation";
+import { Html } from "elm-ts/lib/React";
+import * as home from "~src/page/home";
 import { match, P } from "ts-pattern";
 import { Cmd } from "elm-ts/lib/Cmd";
 import * as route from "~src/route";
@@ -11,12 +10,8 @@ import type { Route } from "~src/route";
 import { flow, pipe } from "fp-ts/function";
 import { tuple } from "fp-ts";
 
-// FLAGS
-
-export type Flags = null;
-
 // MODEL
-export type Model = { _tag: "Main"; model: main.Model } | { _tag: "NotFound" };
+export type Model = { _tag: "Main"; model: home.Model } | { _tag: "NotFound" };
 
 export const locationToMsg = (location: Location): Msg => ({
   _tag: "RouteChanged",
@@ -26,22 +21,21 @@ export const locationToMsg = (location: Location): Msg => ({
 const routeToModelCmd = (route: Route): [Model, Cmd<Msg>] =>
   match<Route, [Model, Cmd<Msg>]>(route)
     .with({ _tag: "Main" }, () => [
-      { _tag: "Main", model: main.init },
+      { _tag: "Main", model: home.init },
       cmd.none,
     ])
     .with({ _tag: "NotFound" }, () => [{ _tag: "NotFound" }, cmd.none])
     .exhaustive();
 
-export const init: (
-  flags: Flags
-) => (location: Location) => [Model, Cmd<Msg>] = () =>
-  flow(route.fromLocation, routeToModelCmd);
+export const init: (location: Location) => [Model, Cmd<Msg>] = flow(
+  route.fromLocation,
+  routeToModelCmd
+);
 
 // MESSAGES
 export type Msg =
-  | { _tag: "GotMainMsg"; msg: main.Msg }
-  | { _tag: "RouteChanged"; route: Route }
-  | { _tag: "Push"; route: Route };
+  | { _tag: "GotMainMsg"; msg: home.Msg }
+  | { _tag: "RouteChanged"; route: Route };
 
 // UPDATE
 export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
@@ -53,7 +47,7 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
       ],
       ({ mainMsg, mainModel }) =>
         pipe(
-          main.update(mainMsg, mainModel),
+          home.update(mainMsg, mainModel),
           tuple.bimap(
             cmd.map((mainMsg_) => ({ _tag: "GotMainMsg", msg: mainMsg_ })),
             (mainModel_) => ({ _tag: "Main", model: mainModel_ })
@@ -61,7 +55,6 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
         )
     )
     .with([{ _tag: "RouteChanged", route: P.select() }, P.any], routeToModelCmd)
-    .with([{ _tag: "Push" }, P.any], () => [model, cmd.none])
     .otherwise(() => [model, cmd.none]);
 
 // VIEW
@@ -70,20 +63,11 @@ export const view = (model: Model): Html<Msg> =>
     .with(
       { _tag: "Main", model: P.select() },
       flow(
-        main.view,
+        home.view,
         html.map((mainMsg) => ({ _tag: "GotMainMsg", msg: mainMsg }))
       )
     )
-    .with({ _tag: "NotFound" }, () => RouteB)
+    .with({ _tag: "NotFound" }, () => notFoundView)
     .exhaustive();
 
-const RouteB: Html<Msg> = (dispatch) => (
-  <div>
-    RouteB{" "}
-    <button
-      onClick={() => dispatch({ _tag: "Push", route: route.defaultRoute })}
-    >
-      RouteA
-    </button>
-  </div>
-);
+const notFoundView: Html<Msg> = () => <div>Page not found!</div>;

@@ -23,12 +23,6 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     .exhaustive();
 
 // VIEW
+
 export const view: (model: Model) => Html<Msg> = (model: Model) => (dispatch) =>
-  (
-    <div>
-      Hello world!
-      <button onClick={() => dispatch({ _tag: "RouteBButtonClicked" })}>
-        RouteB
-      </button>
-    </div>
-  );
+  <div className="prose prose-stone">Hello world!</div>;

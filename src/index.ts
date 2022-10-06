@@ -1,19 +1,12 @@
-import { programWithDebuggerWithFlags } from "elm-ts/lib/Debug/Navigation";
-import { programWithFlags } from "elm-ts/lib/Navigation";
+import { programWithDebugger } from "elm-ts/lib/Debug/Navigation";
+import { program } from "elm-ts/lib/Navigation";
 import * as React from "elm-ts/lib/React";
 import { render } from "react-dom";
-import * as Navigation from "~/src/Navigation";
+import * as page from "~/src/page";
 
-const program =
-  process.env.NODE_ENV === "production"
-    ? programWithFlags
-    : programWithDebuggerWithFlags;
+const program_ =
+  process.env.NODE_ENV === "production" ? program : programWithDebugger;
 
-const main = program(
-  Navigation.locationToMsg,
-  Navigation.init,
-  Navigation.update,
-  Navigation.view
-);
+const main = program_(page.locationToMsg, page.init, page.update, page.view);
 
-React.run(main(null), (dom) => render(dom, document.getElementById("app")));
+React.run(main, (dom) => render(dom, document.getElementById("app")));
