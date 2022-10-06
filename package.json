@@ -4,7 +4,8 @@
   "scripts": {
     "start": "parcel src/index.html",
     "build": "parcel build index.html",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "ci": "prettier --check . && eslint . && npm run test"
   },
   "repository": {
     "type": "git",
@@ -15,15 +16,29 @@
     "@tsconfig/recommended": "^1.0.1",
     "@types/node": "^18.8.2",
     "@types/react-dom": "^18.0.6",
+    "@typescript-eslint/eslint-plugin": "^5.39.0",
+    "@typescript-eslint/parser": "^5.39.0",
+    "eslint": "^8.24.0",
+    "eslint-config-standard-with-typescript": "^23.0.0",
+    "eslint-plugin-fp-ts": "^0.3.2",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-n": "^15.3.0",
+    "eslint-plugin-promise": "^6.0.1",
+    "eslint-plugin-simple-import-sort": "^8.0.0",
     "parcel": "^2.7.0",
+    "prettier": "2.7.1",
     "process": "^0.11.10",
-    "typescript": "^4.8.4"
+    "querystring-es3": "^0.2.1",
+    "typescript": "^4.8.4",
+    "url": "^0.11.0"
   },
   "dependencies": {
     "elm-ts": "^0.6.0",
     "fp-ts": "^2.12.3",
+    "fp-ts-routing": "^0.5.4",
     "react": "^16.14.0",
     "react-dom": "^16.x",
-    "rxjs": "^6.6.7"
+    "rxjs": "^6.6.7",
+    "ts-pattern": "^4.0.5"
   }
 }

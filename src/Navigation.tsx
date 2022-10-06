@@ -1,83 +1,88 @@
 import * as React from "react";
-import { cmd } from "elm-ts";
+import type { ReactNode } from "react";
+import { cmd, html } from "elm-ts";
 import { Location, push } from "elm-ts/lib/Navigation";
-import { Html } from "elm-ts/lib/React";
-
-// ROUTES
-const routes = {
-  RouteA: true,
-  RouteB: true,
-};
-
-type Route = keyof typeof routes;
+import { Dom, Html } from "elm-ts/lib/React";
+import * as main from "~src/main";
+import { match, P } from "ts-pattern";
+import { Cmd } from "elm-ts/lib/Cmd";
+import * as route from "~src/route";
+import type { Route } from "~src/route";
+import { flow, pipe } from "fp-ts/function";
+import { tuple } from "fp-ts";
 
 // FLAGS
-export type Flags = Model;
 
-const defaultRoute: Route = "RouteA";
-
-export const flags: Flags = defaultRoute;
+export type Flags = null;
 
 // MODEL
-export type Model = Route;
+export type Model = { _tag: "Main"; model: main.Model } | { _tag: "NotFound" };
 
-function isRoute(route: string): route is Route {
-  return routes.hasOwnProperty(route);
-}
+export const locationToMsg = (location: Location): Msg => ({
+  _tag: "RouteChanged",
+  route: route.fromLocation(location),
+});
 
-function getRoute(location: Location): Route {
-  const route = location.pathname.substring(1);
-  return isRoute(route) ? route : defaultRoute;
-}
+const routeToModelCmd = (route: Route): [Model, Cmd<Msg>] =>
+  match<Route, [Model, Cmd<Msg>]>(route)
+    .with({ _tag: "Main" }, () => [
+      { _tag: "Main", model: main.init },
+      cmd.none,
+    ])
+    .with({ _tag: "NotFound" }, () => [{ _tag: "NotFound" }, cmd.none])
+    .exhaustive();
 
-export function locationToMsg(location: Location): Msg {
-  return { type: getRoute(location) } as Msg;
-}
-
-export function init(_: Flags): (location: Location) => [Model, cmd.Cmd<Msg>] {
-  return (location) => [getRoute(location), cmd.none];
-}
+export const init: (
+  flags: Flags
+) => (location: Location) => [Model, Cmd<Msg>] = () =>
+  flow(route.fromLocation, routeToModelCmd);
 
 // MESSAGES
 export type Msg =
-  | { type: "RouteA" }
-  | { type: "RouteB" }
-  | { type: "Push"; url: Route };
+  | { _tag: "GotMainMsg"; msg: main.Msg }
+  | { _tag: "RouteChanged"; route: Route }
+  | { _tag: "Push"; route: Route };
 
 // UPDATE
-export function update(msg: Msg, model: Model): [Model, cmd.Cmd<Msg>] {
-  switch (msg.type) {
-    case "RouteA":
-      return ["RouteA", cmd.none];
-
-    case "RouteB":
-      return ["RouteB", cmd.none];
-
-    case "Push":
-      return [model, push(msg.url)];
-  }
-}
+export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
+  match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
+    .with(
+      [
+        { _tag: "GotMainMsg", msg: P.select("mainMsg") },
+        { _tag: "Main", model: P.select("mainModel") },
+      ],
+      ({ mainMsg, mainModel }) =>
+        pipe(
+          main.update(mainMsg, mainModel),
+          tuple.bimap(
+            cmd.map((mainMsg_) => ({ _tag: "GotMainMsg", msg: mainMsg_ })),
+            (mainModel_) => ({ _tag: "Main", model: mainModel_ })
+          )
+        )
+    )
+    .with([{ _tag: "RouteChanged", route: P.select() }, P.any], routeToModelCmd)
+    .with([{ _tag: "Push" }, P.any], () => [model, cmd.none])
+    .otherwise(() => [model, cmd.none]);
 
 // VIEW
-export function view(model: Model): Html<Msg> {
-  return (dispatch) => (
-    <div>{model === "RouteA" ? RouteA(dispatch) : RouteB(dispatch)}</div>
-  );
-}
-
-const RouteA: Html<Msg> = (dispatch) => (
-  <div>
-    RouteA{" "}
-    <button onClick={() => dispatch({ type: "Push", url: "RouteB" })}>
-      RouteB
-    </button>
-  </div>
-);
+export const view = (model: Model): Html<Msg> =>
+  match<Model, Html<Msg>>(model)
+    .with(
+      { _tag: "Main", model: P.select() },
+      flow(
+        main.view,
+        html.map((mainMsg) => ({ _tag: "GotMainMsg", msg: mainMsg }))
+      )
+    )
+    .with({ _tag: "NotFound" }, () => RouteB)
+    .exhaustive();
 
 const RouteB: Html<Msg> = (dispatch) => (
   <div>
     RouteB{" "}
-    <button onClick={() => dispatch({ type: "Push", url: "RouteA" })}>
+    <button
+      onClick={() => dispatch({ _tag: "Push", route: route.defaultRoute })}
+    >
       RouteA
     </button>
   </div>
