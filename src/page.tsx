@@ -11,7 +11,7 @@ import { flow, pipe } from "fp-ts/function";
 import { tuple } from "fp-ts";
 
 // MODEL
-export type Model = { _tag: "Main"; model: home.Model } | { _tag: "NotFound" };
+export type Model = { _tag: "Home"; model: home.Model } | { _tag: "NotFound" };
 
 export const locationToMsg = (location: Location): Msg => ({
   _tag: "RouteChanged",
@@ -20,10 +20,15 @@ export const locationToMsg = (location: Location): Msg => ({
 
 const routeToModelCmd = (route: Route): [Model, Cmd<Msg>] =>
   match<Route, [Model, Cmd<Msg>]>(route)
-    .with({ _tag: "Main" }, () => [
-      { _tag: "Main", model: home.init },
-      cmd.none,
-    ])
+    .with({ _tag: "Home" }, () =>
+      pipe(
+        home.init,
+        tuple.bimap(
+          cmd.map((homeMsg) => ({ _tag: "GotHomeMsg", msg: homeMsg })),
+          (homeModel) => ({ _tag: "Home", model: homeModel })
+        )
+      )
+    )
     .with({ _tag: "NotFound" }, () => [{ _tag: "NotFound" }, cmd.none])
     .exhaustive();
 
@@ -34,7 +39,7 @@ export const init: (location: Location) => [Model, Cmd<Msg>] = flow(
 
 // MESSAGES
 export type Msg =
-  | { _tag: "GotMainMsg"; msg: home.Msg }
+  | { _tag: "GotHomeMsg"; msg: home.Msg }
   | { _tag: "RouteChanged"; route: Route };
 
 // UPDATE
@@ -42,15 +47,15 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
   match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
     .with(
       [
-        { _tag: "GotMainMsg", msg: P.select("mainMsg") },
-        { _tag: "Main", model: P.select("mainModel") },
+        { _tag: "GotHomeMsg", msg: P.select("homeMsg") },
+        { _tag: "Home", model: P.select("homeModel") },
       ],
-      ({ mainMsg, mainModel }) =>
+      ({ homeMsg, homeModel }) =>
         pipe(
-          home.update(mainMsg, mainModel),
+          home.update(homeMsg, homeModel),
           tuple.bimap(
-            cmd.map((mainMsg_) => ({ _tag: "GotMainMsg", msg: mainMsg_ })),
-            (mainModel_) => ({ _tag: "Main", model: mainModel_ })
+            cmd.map((homeMsg_) => ({ _tag: "GotHomeMsg", msg: homeMsg_ })),
+            (homeModel_) => ({ _tag: "Home", model: homeModel_ })
           )
         )
     )
@@ -61,10 +66,10 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
 export const view = (model: Model): Html<Msg> =>
   match<Model, Html<Msg>>(model)
     .with(
-      { _tag: "Main", model: P.select() },
+      { _tag: "Home", model: P.select() },
       flow(
         home.view,
-        html.map((mainMsg) => ({ _tag: "GotMainMsg", msg: mainMsg }))
+        html.map((homeMsg) => ({ _tag: "GotHomeMsg", msg: homeMsg }))
       )
     )
     .with({ _tag: "NotFound" }, () => notFoundView)

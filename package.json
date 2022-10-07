@@ -36,9 +36,15 @@
     "url": "^0.11.0"
   },
   "dependencies": {
+    "@tiptap/core": "^2.0.0-beta.199",
+    "@tiptap/extension-placeholder": "^2.0.0-beta.199",
+    "@tiptap/extension-underline": "^2.0.0-beta.199",
+    "@tiptap/starter-kit": "^2.0.0-beta.199",
     "elm-ts": "^0.6.0",
     "fp-ts": "^2.12.3",
     "fp-ts-routing": "^0.5.4",
+    "fp-ts-rxjs": "^0.6.15",
+    "prosemirror-collab": "^1.3.0",
     "react": "^16.14.0",
     "react-dom": "^16.x",
     "rxjs": "^6.6.7",
