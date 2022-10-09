@@ -17,7 +17,7 @@ import { match, P } from "ts-pattern";
 import type { Id } from "~src/backend/_generated/dataModel";
 import * as cmdExtra from "~src/frontend/cmdExtra";
 import type {
-  Interop,
+  SubscriptionInterop,
   SubscriptionManager,
 } from "~src/frontend/subscriptionManager";
 import * as subscriptionManager from "~src/frontend/subscriptionManager";
@@ -50,7 +50,7 @@ export const init = ({
   doc: string;
   version: number;
 }): Model => {
-  const interop: Interop<Msg> =
+  const subscriptionInterop: SubscriptionInterop<Msg> =
     subscriptionManager.manageSubscriptions<Msg>()();
   const clientId = crypto.randomUUID();
 
@@ -71,7 +71,7 @@ export const init = ({
       }),
     ],
     onTransaction: (props) => {
-      interop.dispatch({
+      subscriptionInterop.dispatch({
         _tag: "EditorTransactionApplied",
         editorState: props.editor.state,
       })();
@@ -84,7 +84,7 @@ export const init = ({
     editor,
     getStepsSince,
     sendSteps,
-    subscriptionManager: interop.subscriptionManager,
+    subscriptionManager: subscriptionInterop.subscriptionManager,
     areStepsInFlight: false,
   };
 };
@@ -195,4 +195,4 @@ const sendStepsCmd: (
 // SUBSCRIPTIONS
 
 export const subscriptions: (model: Model) => Sub<Msg> = (model) =>
-  subscriptionManager.getSubscriptions(model.subscriptionManager);
+  subscriptionManager.subscriptions(model.subscriptionManager);

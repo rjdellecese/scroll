@@ -12,14 +12,14 @@ export type SubscriptionManager<Msg> = {
 
 export type SubscriptionCallback<Msg> = (msg: Msg) => IO<void>;
 
-export type Interop<Msg> = {
+export type SubscriptionInterop<Msg> = {
   dispatch: (msg: Msg) => IO<void>;
   subscriptionManager: SubscriptionManager<Msg>;
 };
 
 type Subscriptions<Msg> = IORef<SubscriptionCallback<Msg>[]>;
 
-export const getSubscriptions: <Msg>(
+export const subscriptions: <Msg>(
   subscriptionManager: SubscriptionManager<Msg>
 ) => Sub<Msg> = <Msg>(subscriptionManager: SubscriptionManager<Msg>) => {
   return new rxjs.Observable((subscriber: rxjs.Subscriber<Msg>) => {
@@ -33,7 +33,9 @@ export const getSubscriptions: <Msg>(
   });
 };
 
-export const manageSubscriptions: <Msg>() => IO<Interop<Msg>> = <Msg>() =>
+export const manageSubscriptions: <Msg>() => IO<SubscriptionInterop<Msg>> = <
+  Msg
+>() =>
   pipe(
     ioRef.newIORef<SubscriptionCallback<Msg>[]>([]),
     io.chain((subscriptions) => () => ({
