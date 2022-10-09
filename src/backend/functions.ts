@@ -1,9 +1,11 @@
-import { DatabaseReader, mutation, query } from "./_generated/server";
-import { Id, Document } from "./_generated/dataModel";
 import { Node } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 import { Step } from "prosemirror-transform";
+
 import { schema } from "../tiptapSchemaExtensions";
+import type { Document, Id } from "./_generated/dataModel";
+import type { DatabaseReader } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 
 export const getStepsSince = query(
   async ({ db }, docId: Id<"docs">, version: number) => {
@@ -126,8 +128,7 @@ const getVersion = async (
 
   const getVersion = async () => {
     let versionCounter = 0;
-    for await (const step of stepsQuery) {
-      void step;
+    for await (const _step of stepsQuery) {
       versionCounter += 1;
     }
     return versionCounter;

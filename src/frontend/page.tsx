@@ -1,16 +1,17 @@
-import * as React from "react";
 import { cmd, html } from "elm-ts";
-import * as cmdExtra from "~/src/frontend/cmdExtra";
-import { Location } from "elm-ts/lib/Navigation";
-import { Html } from "elm-ts/lib/React";
-import * as home from "~src/frontend/page/home";
-import { match, P } from "ts-pattern";
-import { Cmd } from "elm-ts/lib/Cmd";
-import * as route from "~src/frontend/route";
-import type { Route } from "~src/frontend/route";
-import { flow, pipe } from "fp-ts/function";
+import type { Cmd } from "elm-ts/lib/Cmd";
+import type { Location } from "elm-ts/lib/Navigation";
+import type { Html } from "elm-ts/lib/React";
 import { tuple } from "fp-ts";
+import { flow, pipe } from "fp-ts/function";
+import * as React from "react";
+import { match, P } from "ts-pattern";
+
+import * as cmdExtra from "~/src/frontend/cmdExtra";
 import * as convexClient from "~src/frontend/convexClient";
+import * as home from "~src/frontend/page/home";
+import type { Route } from "~src/frontend/route";
+import * as route from "~src/frontend/route";
 
 // MODEL
 
