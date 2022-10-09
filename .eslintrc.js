@@ -9,7 +9,12 @@ module.exports = {
     ecmaVersion: "latest",
     sourceType: "module",
   },
-  plugins: ["@typescript-eslint", "fp-ts", "simple-import-sort"],
+  plugins: [
+    "@typescript-eslint",
+    "fp-ts",
+    "simple-import-sort",
+    "no-type-assertion",
+  ],
   root: true,
   rules: {
     strict: "error",
@@ -21,6 +26,7 @@ module.exports = {
       "error",
       { argsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" },
     ],
+    "no-type-assertion/no-type-assertion": "error",
     "no-unused-vars": "off",
     "no-redeclare": "off", // `fp-ts` relies on redeclarations for its implementation of higher-kinded types
   },
