@@ -1,16 +1,19 @@
 import * as React from "react";
 import { cmd, html } from "elm-ts";
+import * as cmdExtra from "~/src/frontend/cmdExtra";
 import { Location } from "elm-ts/lib/Navigation";
 import { Html } from "elm-ts/lib/React";
-import * as home from "~src/page/home";
+import * as home from "~src/frontend/page/home";
 import { match, P } from "ts-pattern";
 import { Cmd } from "elm-ts/lib/Cmd";
-import * as route from "~src/route";
-import type { Route } from "~src/route";
+import * as route from "~src/frontend/route";
+import type { Route } from "~src/frontend/route";
 import { flow, pipe } from "fp-ts/function";
 import { tuple } from "fp-ts";
+import * as convexClient from "~src/frontend/convexClient";
 
 // MODEL
+
 export type Model = { _tag: "Home"; model: home.Model } | { _tag: "NotFound" };
 
 export const locationToMsg = (location: Location): Msg => ({
@@ -34,15 +37,20 @@ const routeToModelCmd = (route: Route): [Model, Cmd<Msg>] =>
 
 export const init: (location: Location) => [Model, Cmd<Msg>] = flow(
   route.fromLocation,
-  routeToModelCmd
+  routeToModelCmd,
+  tuple.mapSnd((cmd_) =>
+    cmd.batch([cmd_, cmdExtra.ignore(cmdExtra.fromIO(convexClient.create))])
+  )
 );
 
 // MESSAGES
+
 export type Msg =
   | { _tag: "GotHomeMsg"; msg: home.Msg }
   | { _tag: "RouteChanged"; route: Route };
 
 // UPDATE
+
 export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
   match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
     .with(
@@ -63,6 +71,7 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     .otherwise(() => [model, cmd.none]);
 
 // VIEW
+
 export const view = (model: Model): Html<Msg> =>
   match<Model, Html<Msg>>(model)
     .with(

@@ -35,5 +35,12 @@ module.exports = {
   },
   plugins: ["@typescript-eslint", "fp-ts", "simple-import-sort"],
   root: true,
-  rules: {},
+  rules: {
+    strict: "error",
+    "no-warning-comments": "error",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      { argsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" },
+    ],
+  },
 };

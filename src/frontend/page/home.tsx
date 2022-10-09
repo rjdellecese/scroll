@@ -7,7 +7,7 @@ import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Placeholder from "@tiptap/extension-placeholder";
-import * as cmdExtra from "~/src/cmdExtra";
+import * as cmdExtra from "~/src/frontend/cmdExtra";
 import { option } from "fp-ts";
 import { flow, pipe } from "fp-ts/function";
 

@@ -10,7 +10,7 @@
 
     /* These compiler options are required by Convex */
     "target": "ESNext",
-    "lib": ["ES2021"],
+    "lib": ["DOM", "ES2021"],
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true,
     "module": "ESNext",
@@ -20,9 +20,6 @@
     /* Prevents node_modules from adding additional global types e.g. node types */
     "types": []
   },
-  "include": [
-    "./**/*",
-    "../node_modules/convex/dist/esm/environment/index.d.ts"
-  ],
+  "include": ["./**/*"],
   "exclude": ["./_generated"]
 }

@@ -2,6 +2,6 @@
   "project": "forever-note-ba699",
   "team": "rjdellecese",
   "prodUrl": "https://clean-wren-150.convex.cloud",
-  "functions": "convex/",
+  "functions": "src/backend/",
   "authInfo": []
 }
