@@ -18,15 +18,15 @@ module.exports = {
   root: true,
   rules: {
     strict: "error",
-    "simple-import-sort/imports": "error",
-    "simple-import-sort/exports": "error",
-    "no-warning-comments": "error",
-    "@typescript-eslint/consistent-type-imports": "error",
+    "simple-import-sort/imports": "warn",
+    "simple-import-sort/exports": "warn",
+    "no-warning-comments": "warn",
+    "@typescript-eslint/consistent-type-imports": "warn",
     "@typescript-eslint/no-unused-vars": [
-      "error",
+      "warn",
       { argsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" },
     ],
-    "no-type-assertion/no-type-assertion": "error",
+    "no-type-assertion/no-type-assertion": "warn",
     "no-unused-vars": "off",
     "no-redeclare": "off", // `fp-ts` relies on redeclarations for its implementation of higher-kinded types
   },

@@ -3,7 +3,10 @@ import { array, io, ioRef } from "fp-ts";
 import { apply, constVoid, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/IO";
 import type { IORef } from "fp-ts/IORef";
-import * as rxjs from "rxjs";
+import type { Subscriber } from "rxjs";
+import { Observable } from "rxjs";
+
+// TODO: Need to improve naming here, and also my conceptual understanding. What is this module actually doing, exactly? It's really like interop for impure interfaces, right? `ImpureInterop`?
 
 export type SubscriptionManager<Msg> = {
   subscribe: (callback: SubscriptionCallback<Msg>) => IO<void>;
@@ -22,7 +25,7 @@ type Subscriptions<Msg> = IORef<SubscriptionCallback<Msg>[]>;
 export const subscriptions: <Msg>(
   subscriptionManager: SubscriptionManager<Msg>
 ) => Sub<Msg> = <Msg>(subscriptionManager: SubscriptionManager<Msg>) => {
-  return new rxjs.Observable((subscriber: rxjs.Subscriber<Msg>) => {
+  return new Observable((subscriber: Subscriber<Msg>) => {
     const handle: (msg: Msg) => IO<void> = (msg) => () => subscriber.next(msg);
 
     subscriptionManager.subscribe(handle)();
