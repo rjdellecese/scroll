@@ -15,38 +15,17 @@ import * as cmdExtra from "~/src/frontend/cmdExtra";
 import { Id } from "~src/backend/_generated/dataModel";
 import type { ConvexAPI } from "~src/backend/_generated/react";
 import * as editor from "~src/frontend/editor";
-import type { ElmTsConvexClient } from "~src/frontend/elmTsConvexClient";
 import * as elmTsConvexClient from "~src/frontend/elmTsConvexClient";
 
 // MODEl
 
 export type Model =
-  | {
-      _tag: "LoadingDoc";
-      watchedQuery: elmTsConvexClient.WatchedQuery<
-        ConvexAPI,
-        "getDocAndVersion"
-      >;
-    }
-  | {
-      _tag: "LoadedDoc";
-      editorModel: editor.Model;
-      watchedQuery: elmTsConvexClient.WatchedQuery<
-        ConvexAPI,
-        "getDocAndVersion"
-      >;
-    };
+  | { _tag: "LoadingDoc" }
+  | { _tag: "LoadedDoc"; editorModel: editor.Model };
 
-export const init: (convexClient: ElmTsConvexClient<ConvexAPI>) => Model = (
-  convexClient
-) => ({
+export const init: Model = {
   _tag: "LoadingDoc",
-  watchedQuery: elmTsConvexClient.watchQuery(
-    convexClient,
-    "getDocAndVersion",
-    docId
-  ),
-});
+};
 
 // UPDATE
 
@@ -92,7 +71,6 @@ export const update =
           {
             _tag: "LoadedDoc",
             editorModel: editor.init({ docId: docId, doc, version }),
-            watchedQuery: model.watchedQuery,
           },
           cmd.none,
         ]
@@ -113,7 +91,6 @@ export const update =
               (editorModel_) => ({
                 _tag: "LoadedDoc",
                 editorModel: editorModel_,
-                watchedQuery: model.watchedQuery,
               })
             )
           )
@@ -146,9 +123,11 @@ export const view: (model: Model) => Html<Msg> = (model: Model) =>
 export const subscriptions =
   (convexClient: elmTsConvexClient.ElmTsConvexClient<ConvexAPI>) =>
   (model: Model) =>
-    elmTsConvexClient.watchedQuerySub(
-      model.watchedQuery,
-      ({ doc, version }): Msg => ({ _tag: "GotDocAndVersion", doc, version })
+    elmTsConvexClient.watchQuery(
+      convexClient,
+      ({ doc, version }): Msg => ({ _tag: "GotDocAndVersion", doc, version }),
+      "getDocAndVersion",
+      docId
     );
 
 // TODO: Remove

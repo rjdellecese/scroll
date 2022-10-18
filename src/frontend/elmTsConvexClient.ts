@@ -19,7 +19,7 @@ import { Task } from "fp-ts/lib/Task";
 import { observable } from "fp-ts-rxjs";
 import type { Observable } from "rxjs";
 import * as rx from "rxjs";
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, Subject } from "rxjs";
 import {
   filter as rxFilter,
   finalize as rxFinalize,
@@ -29,7 +29,6 @@ import { match } from "ts-pattern";
 
 import clientConfig from "~src/backend/_generated/clientConfig";
 import * as cmdExtra from "~src/frontend/cmdExtra";
-import { watch } from "fs";
 
 // TODO: Use functions from `fp-ts-rxjs` in place of `rxjs` when possible (check `rxjs/**/*` imports)
 
@@ -41,7 +40,7 @@ export type ElmTsConvexClient<API extends GenericAPI> = {
 
 type WatchedQueryResults<API extends GenericAPI> = Map<
   QueryToken,
-  BehaviorSubject<Option<ReturnType<NamedQuery<API, QueryNames<API>>>>>
+  Subject<Option<ReturnType<NamedQuery<API, QueryNames<API>>>>>
 >;
 
 export const init = <API extends GenericAPI>(): ElmTsConvexClient<API> => {
@@ -59,44 +58,20 @@ export const init = <API extends GenericAPI>(): ElmTsConvexClient<API> => {
   };
 };
 
-export type WatchedQuery<
-  API extends GenericAPI,
-  Name extends QueryNames<API>
-> = {
-  readonly behaviorSubject: BehaviorSubject<
-    Option<ReturnType<NamedQuery<API, Name>>>
-  >;
-};
-
-export const watchedQuerySub: <
+export const watchQuery = <
   API extends GenericAPI,
   Name extends QueryNames<API>,
   Msg
 >(
-  watchedQuery: WatchedQuery<API, Name>,
-  onResultChange: (result: ReturnType<NamedQuery<API, Name>>) => Msg
-) => Sub<Msg> = (watchedQuery, onResultChange) =>
-  watchedQuery.behaviorSubject.asObservable().pipe(
-    rxMergeMap(
-      option.match(
-        () => rx.EMPTY,
-        (result) => pipe(result, onResultChange, observable.of)
-      )
-    )
-  );
-
-export const watchQuery = <
-  API extends GenericAPI,
-  Name extends QueryNames<API>
->(
   elmTsConvexClient: ElmTsConvexClient<API>,
+  onResultChange: (result: ReturnType<NamedQuery<API, Name>>) => Msg,
   name: Name,
   ...args: Parameters<NamedQuery<API, Name>>
-): WatchedQuery<API, Name> => {
+): Sub<Msg> => {
   /* eslint-disable no-type-assertion/no-type-assertion */
-  const latestQueryResultBehaviorSubject = new BehaviorSubject<
+  const latestQueryResultSubject = new Subject<
     Option<ReturnType<NamedQuery<API, Name>>>
-  >(option.none);
+  >();
 
   const { queryToken, unsubscribe } =
     elmTsConvexClient.internalConvexClient.subscribe(name, args);
@@ -136,15 +111,22 @@ export const watchQuery = <
     })
   );
 
-  latestQueryResultObservable.subscribe(latestQueryResultBehaviorSubject);
+  latestQueryResultObservable.subscribe(latestQueryResultSubject);
 
   elmTsConvexClient.ioRefWatchedQueryResults.modify((watchedQueryResults) =>
-    map.upsertAt(string.Eq)(queryToken, latestQueryResultBehaviorSubject)(
+    map.upsertAt(string.Eq)(queryToken, latestQueryResultSubject)(
       watchedQueryResults
     )
   )();
 
-  return { behaviorSubject: latestQueryResultBehaviorSubject };
+  return latestQueryResultSubject.asObservable().pipe(
+    rxMergeMap(
+      option.match(
+        () => rx.EMPTY,
+        (result) => pipe(result, onResultChange, observable.of)
+      )
+    )
+  );
 };
 
 export const runMutation = <

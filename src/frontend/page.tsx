@@ -35,27 +35,26 @@ export const locationToMsg = (location: Location): Msg => ({
   route: route.fromLocation(location),
 });
 
-const routeToModelCmd =
-  (convexClient: ElmTsConvexClient<ConvexAPI>) =>
-  (route: Route): [Model, Cmd<Msg>] =>
-    pipe(
-      match<Route, [Page, Cmd<Msg>]>(route)
-        .with({ _tag: "Home" }, () => [
-          {
-            _tag: "Home",
-            model: home.init(convexClient),
-          },
-          cmd.none,
-        ])
-        .with({ _tag: "NotFound" }, () => [{ _tag: "NotFound" }, cmd.none])
-        .exhaustive(),
-      tuple.mapFst((page) => ({ convexClient: convexClient, page }))
-    );
+const routeToPageCmd = (route: Route): [Page, Cmd<Msg>] =>
+  match<Route, [Page, Cmd<Msg>]>(route)
+    .with({ _tag: "Home" }, () => [
+      {
+        _tag: "Home",
+        model: home.init,
+      },
+      cmd.none,
+    ])
+    .with({ _tag: "NotFound" }, () => [{ _tag: "NotFound" }, cmd.none])
+    .exhaustive();
 
 export const init: (
   flags: Flags
 ) => (location: Location) => [Model, Cmd<Msg>] = (flags) =>
-  flow(route.fromLocation, routeToModelCmd(flags.convexClient));
+  flow(
+    route.fromLocation,
+    routeToPageCmd,
+    tuple.mapFst((page) => ({ convexClient: flags.convexClient, page }))
+  );
 
 // MESSAGES
 
@@ -66,32 +65,32 @@ export type Msg =
 // UPDATE
 
 export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
-  match<[Msg, Page], [Model, Cmd<Msg>]>([msg, model.page])
-    .with(
-      [
-        { _tag: "GotHomeMsg", msg: P.select("homeMsg") },
-        {
-          _tag: "Home",
-          model: P.select("homeModel"),
-        },
-      ],
-      ({ homeMsg, homeModel }) =>
-        pipe(
-          home.update(model.convexClient)(homeMsg, homeModel),
-          tuple.bimap(
-            cmd.map((homeMsg_) => ({ _tag: "GotHomeMsg", msg: homeMsg_ })),
-            (homeModel_) => ({
-              convexClient: model.convexClient,
-              page: { _tag: "Home", model: homeModel_ },
-            })
+  pipe(
+    match<[Msg, Page], [Page, Cmd<Msg>]>([msg, model.page])
+      .with(
+        [
+          { _tag: "GotHomeMsg", msg: P.select("homeMsg") },
+          {
+            _tag: "Home",
+            model: P.select("homeModel"),
+          },
+        ],
+        ({ homeMsg, homeModel }) =>
+          pipe(
+            home.update(model.convexClient)(homeMsg, homeModel),
+            tuple.bimap(
+              cmd.map((homeMsg_) => ({ _tag: "GotHomeMsg", msg: homeMsg_ })),
+              (homeModel_) => ({ _tag: "Home", model: homeModel_ })
+            )
           )
-        )
-    )
-    .with(
-      [{ _tag: "RouteChanged", route: P.select() }, P.any],
-      routeToModelCmd(model.convexClient)
-    )
-    .otherwise(() => [model, cmd.none]);
+      )
+      .with(
+        [{ _tag: "RouteChanged", route: P.select() }, P.any],
+        routeToPageCmd
+      )
+      .otherwise(() => [model.page, cmd.none]),
+    tuple.mapFst((page) => ({ ...model, page }))
+  );
 
 // VIEW
 
