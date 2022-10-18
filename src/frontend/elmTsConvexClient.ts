@@ -7,12 +7,16 @@ import type {
   QueryToken,
 } from "convex/browser";
 import { InternalConvexClient } from "convex/browser";
+import { cmd } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Sub } from "elm-ts/lib/Sub";
-import { array, ioRef, map, option, string } from "fp-ts";
-import { flow, hole, pipe } from "fp-ts/lib/function";
+import { array, io, ioRef, map, option, string, task, taskOption } from "fp-ts";
+import { flow, pipe } from "fp-ts/lib/function";
+import { IO } from "fp-ts/lib/IO";
 import type { IORef } from "fp-ts/lib/IORef";
 import type { Option } from "fp-ts/lib/Option";
+import { Task } from "fp-ts/lib/Task";
+import { observable } from "fp-ts-rxjs";
 import type { Observable } from "rxjs";
 import * as rx from "rxjs";
 import { BehaviorSubject } from "rxjs";
@@ -24,22 +28,23 @@ import {
 import { match } from "ts-pattern";
 
 import clientConfig from "~src/backend/_generated/clientConfig";
+import * as cmdExtra from "~src/frontend/cmdExtra";
+import { watch } from "fs";
 
-type ElmTsConvexClient<API extends GenericAPI, Name extends QueryNames<API>> = {
+// TODO: Use functions from `fp-ts-rxjs` in place of `rxjs` when possible (check `rxjs/**/*` imports)
+
+export type ElmTsConvexClient<API extends GenericAPI> = {
   readonly internalConvexClient: InternalConvexClient;
   readonly latestUpdatedQueryResults: BehaviorSubject<QueryToken[]>;
-  readonly ioRefWatchedQueryResults: IORef<WatchedQueryResults<API, Name>>;
+  readonly ioRefWatchedQueryResults: IORef<WatchedQueryResults<API>>;
 };
 
-type WatchedQueryResults<
-  API extends GenericAPI,
-  Name extends QueryNames<API>
-> = Map<QueryToken, BehaviorSubject<Option<ReturnType<NamedQuery<API, Name>>>>>;
+type WatchedQueryResults<API extends GenericAPI> = Map<
+  QueryToken,
+  BehaviorSubject<Option<ReturnType<NamedQuery<API, QueryNames<API>>>>>
+>;
 
-export const create = <
-  API extends GenericAPI,
-  Name extends QueryNames<API>
->(): ElmTsConvexClient<API, Name> => {
+export const init = <API extends GenericAPI>(): ElmTsConvexClient<API> => {
   const latestUpdatedQueryResults = new BehaviorSubject<QueryToken[]>([]);
 
   return {
@@ -54,17 +59,41 @@ export const create = <
   };
 };
 
-export const watchQuery = <
+export type WatchedQuery<
+  API extends GenericAPI,
+  Name extends QueryNames<API>
+> = {
+  readonly behaviorSubject: BehaviorSubject<
+    Option<ReturnType<NamedQuery<API, Name>>>
+  >;
+};
+
+export const watchedQuerySub: <
   API extends GenericAPI,
   Name extends QueryNames<API>,
   Msg
 >(
-  elmTsConvexClient: ElmTsConvexClient<API, Name>,
-  latestUpdatedQueryResults: BehaviorSubject<QueryToken[]>,
-  onResultChange: (result: ReturnType<NamedQuery<API, Name>>) => Msg,
+  watchedQuery: WatchedQuery<API, Name>,
+  onResultChange: (result: ReturnType<NamedQuery<API, Name>>) => Msg
+) => Sub<Msg> = (watchedQuery, onResultChange) =>
+  watchedQuery.behaviorSubject.asObservable().pipe(
+    rxMergeMap(
+      option.match(
+        () => rx.EMPTY,
+        (result) => pipe(result, onResultChange, observable.of)
+      )
+    )
+  );
+
+export const watchQuery = <
+  API extends GenericAPI,
+  Name extends QueryNames<API>
+>(
+  elmTsConvexClient: ElmTsConvexClient<API>,
   name: Name,
   ...args: Parameters<NamedQuery<API, Name>>
-): Sub<Msg> => {
+): WatchedQuery<API, Name> => {
+  /* eslint-disable no-type-assertion/no-type-assertion */
   const latestQueryResultBehaviorSubject = new BehaviorSubject<
     Option<ReturnType<NamedQuery<API, Name>>>
   >(option.none);
@@ -74,7 +103,7 @@ export const watchQuery = <
 
   const latestQueryResultObservable: Observable<
     Option<ReturnType<NamedQuery<API, Name>>>
-  > = latestUpdatedQueryResults.pipe(
+  > = elmTsConvexClient.latestUpdatedQueryResults.pipe(
     rxFilter((updatedQueryTokens) =>
       array.exists((updatedQueryToken: QueryToken) =>
         string.Eq.equals(queryToken, updatedQueryToken)
@@ -99,7 +128,12 @@ export const watchQuery = <
         )
         .exhaustive()
     ),
-    rxFinalize(unsubscribe)
+    rxFinalize(() => {
+      elmTsConvexClient.ioRefWatchedQueryResults.modify((watchedQueryResults) =>
+        map.deleteAt(string.Eq)(queryToken)(watchedQueryResults)
+      )();
+      unsubscribe();
+    })
   );
 
   latestQueryResultObservable.subscribe(latestQueryResultBehaviorSubject);
@@ -110,23 +144,26 @@ export const watchQuery = <
     )
   )();
 
-  return latestQueryResultBehaviorSubject.asObservable().pipe(
-    rxMergeMap(
-      option.match(
-        () => rx.EMPTY,
-        flow(onResultChange, (msg) => rx.of(msg))
-      )
-    )
-  );
+  return { behaviorSubject: latestQueryResultBehaviorSubject };
 };
 
-export const runMutation: <
+export const runMutation = <
   API extends GenericAPI,
   Name extends MutationNames<API>,
   Msg
 >(
-  elmTsConvexClient: ElmTsConvexClient<API, Name>,
+  elmTsConvexClient: ElmTsConvexClient<API>,
   onComplete: (result: ReturnType<NamedMutation<API, Name>>) => Msg,
   name: Name,
   ...args: Parameters<NamedMutation<API, Name>>
-) => Cmd<Msg> = hole(); // TODO: Implement
+): Cmd<Msg> =>
+  /* eslint-disable no-type-assertion/no-type-assertion */
+  pipe(
+    (): Promise<ReturnType<NamedMutation<API, Name>>> =>
+      elmTsConvexClient.internalConvexClient.mutate(name, args) as Promise<
+        ReturnType<NamedMutation<API, Name>>
+      >,
+    taskOption.fromTask,
+    observable.of,
+    cmdExtra.map(onComplete)
+  );

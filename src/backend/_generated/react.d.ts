@@ -18,7 +18,11 @@ import type {
   UseMutationForAPI,
   UseConvexForAPI,
 } from "convex/react";
-import type * as functions from "../functions";
+import type * as createEmptyDoc from "../createEmptyDoc";
+import type * as getDocAndVersion from "../getDocAndVersion";
+import type * as getStepsSince from "../getStepsSince";
+import type * as getVersion from "../getVersion";
+import type * as sendSteps from "../sendSteps";
 
 /**
  * A type describing your app's public Convex API.
@@ -30,7 +34,11 @@ import type * as functions from "../functions";
  * `ConvexReactClient` to create app-specific types.
  */
 export type ConvexAPI = ApiFromModules<{
-  functions: typeof functions;
+  createEmptyDoc: typeof createEmptyDoc;
+  getDocAndVersion: typeof getDocAndVersion;
+  getStepsSince: typeof getStepsSince;
+  getVersion: typeof getVersion;
+  sendSteps: typeof sendSteps;
 }>;
 
 /**

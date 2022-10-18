@@ -5,7 +5,7 @@ import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { array, option, readonlyArray, task } from "fp-ts";
-import { flow, pipe } from "fp-ts/function";
+import { flow, hole, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
 import type { Option } from "fp-ts/Option";
 import type { Task } from "fp-ts/Task";
@@ -26,16 +26,17 @@ import type {
 } from "~src/frontend/subscriptionManager";
 import * as subscriptionManager from "~src/frontend/subscriptionManager";
 import { extensions } from "~src/tiptapSchemaExtensions";
+import * as elmTsConvexClient from "./elmTsConvexClient";
+import { ElmTsConvexClient } from "./elmTsConvexClient";
+import { ConvexAPI } from "~src/backend/_generated/react";
 
 // MODEL
 
-type Model = {
+export type Model = {
   initializableEditor: InitializableEditor;
   docId: Id<"docs">;
   clientId: string;
   areStepsInFlight: boolean;
-  getStepsSince: any;
-  sendSteps: any;
 };
 
 // TODO: Maybe parameterize entire `Model` by this distinction?
@@ -52,14 +53,10 @@ type InitializableEditor =
     };
 
 export const init = ({
-  getStepsSince,
-  sendSteps,
   docId,
   doc,
   version,
 }: {
-  getStepsSince: any;
-  sendSteps: any;
   docId: Id<"docs">;
   doc: string;
   version: number;
@@ -71,8 +68,6 @@ export const init = ({
     docId,
     clientId,
     initializableEditor: { _tag: "InitializingEditor", doc, version },
-    getStepsSince,
-    sendSteps,
     areStepsInFlight: false,
   };
 };
@@ -97,122 +92,142 @@ type InitializedEditorMsg =
   | { _tag: "ReceivedSteps"; steps: string[]; clientIds: string[] }
   | { _tag: "ComponentWillUnmount" };
 
-export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
-  match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
-    .with(
-      [
-        { _tag: "GotInitializedEditorMsg" },
-        { initializableEditor: { _tag: "InitializedEditor" } },
-      ],
-      ([{ msg: initializedEditorMsg }, initializedEditorModel]) =>
-        match<InitializedEditorMsg, [Model, Cmd<Msg>]>(initializedEditorMsg)
-          .with(
-            { _tag: "EditorTransactionApplied", editorState: P.select() },
-            (editorState) =>
-              match<boolean, [Model, Cmd<Msg>]>(model.areStepsInFlight)
-                .with(true, () => [model, cmd.none])
-                .with(false, () => {
-                  const sendableSteps = collab.sendableSteps(editorState);
+export const update =
+  (convexClient: ElmTsConvexClient<ConvexAPI>) =>
+  (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
+    match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
+      .with(
+        [
+          { _tag: "GotInitializedEditorMsg" },
+          { initializableEditor: { _tag: "InitializedEditor" } },
+        ],
+        ([{ msg: initializedEditorMsg }, initializedEditorModel]) =>
+          match<InitializedEditorMsg, [Model, Cmd<Msg>]>(initializedEditorMsg)
+            .with(
+              { _tag: "EditorTransactionApplied", editorState: P.select() },
+              (editorState) =>
+                match<boolean, [Model, Cmd<Msg>]>(model.areStepsInFlight)
+                  .with(true, () => [model, cmd.none])
+                  .with(false, () => {
+                    const sendableSteps = collab.sendableSteps(editorState);
 
-                  return match<
-                    ReturnType<typeof collab.sendableSteps>,
-                    [Model, Cmd<Msg>]
-                  >(sendableSteps)
-                    .with(null, () => [model, cmd.none])
-                    .with(P.not(null), ({ version, steps }) => [
-                      Lens.fromProp<Model>()("areStepsInFlight").set(true)(
-                        model
-                      ),
-                      sendStepsCmd(model.sendSteps, {
-                        docId: model.docId,
-                        clientId: model.clientId,
-                        version: version,
-                        steps: readonlyArray.toArray(steps),
-                      }),
-                    ])
-                    .exhaustive();
-                })
-                .exhaustive()
-          )
-          .with({ _tag: "StepsSent" }, () => {
-            const sendableSteps = collab.sendableSteps(
-              initializedEditorModel.initializableEditor.editor.state
-            );
+                    return match<
+                      ReturnType<typeof collab.sendableSteps>,
+                      [Model, Cmd<Msg>]
+                    >(sendableSteps)
+                      .with(null, () => [model, cmd.none])
+                      .with(P.not(null), ({ version, steps }) => [
+                        Lens.fromProp<Model>()("areStepsInFlight").set(true)(
+                          model
+                        ),
+                        elmTsConvexClient.runMutation(
+                          convexClient,
+                          () => ({
+                            _tag: "GotInitializedEditorMsg",
+                            msg: { _tag: "StepsSent" },
+                          }),
+                          "sendSteps",
+                          model.docId,
+                          model.clientId,
+                          version,
+                          readonlyArray
+                            .toArray(steps)
+                            .map((step: Step) => JSON.stringify(step.toJSON()))
+                        ),
+                      ])
+                      .exhaustive();
+                  })
+                  .exhaustive()
+            )
+            .with({ _tag: "StepsSent" }, () => {
+              const sendableSteps = collab.sendableSteps(
+                initializedEditorModel.initializableEditor.editor.state
+              );
 
-            return match<
-              ReturnType<typeof collab.sendableSteps>,
-              [Model, Cmd<Msg>]
-            >(sendableSteps)
-              .with(null, () => [
-                Lens.fromProp<Model>()("areStepsInFlight").set(false)(model),
-                cmd.none,
-              ])
-              .with(P.not(null), ({ version, steps }) => [
-                Lens.fromProp<Model>()("areStepsInFlight").set(true)(model),
-                sendStepsCmd(model.sendSteps, {
-                  docId: model.docId,
-                  clientId: model.clientId,
-                  version: version,
-                  steps: readonlyArray.toArray(steps),
-                }),
-              ])
-              .exhaustive();
-          })
-          .with({ _tag: "ReceivedSteps" }, ({ steps, clientIds }) => {
-            const parsedSteps = array.map<string, Step>((step) =>
-              Step.fromJSON(
-                initializedEditorModel.initializableEditor.editor.schema,
-                JSON.parse(step)
-              )
-            )(steps);
+              return match<
+                ReturnType<typeof collab.sendableSteps>,
+                [Model, Cmd<Msg>]
+              >(sendableSteps)
+                .with(null, () => [
+                  Lens.fromProp<Model>()("areStepsInFlight").set(false)(model),
+                  cmd.none,
+                ])
+                .with(P.not(null), ({ version, steps }) => [
+                  Lens.fromProp<Model>()("areStepsInFlight").set(true)(model),
+                  elmTsConvexClient.runMutation(
+                    convexClient,
+                    () => ({
+                      _tag: "GotInitializedEditorMsg",
+                      msg: { _tag: "StepsSent" },
+                    }),
+                    "sendSteps",
+                    model.docId,
+                    model.clientId,
+                    version,
+                    readonlyArray
+                      .toArray(steps)
+                      .map((step: Step) => JSON.stringify(step.toJSON()))
+                  ),
+                ])
+                .exhaustive();
+            })
+            .with({ _tag: "ReceivedSteps" }, ({ steps, clientIds }) => {
+              const parsedSteps = array.map<string, Step>((step) =>
+                Step.fromJSON(
+                  initializedEditorModel.initializableEditor.editor.schema,
+                  JSON.parse(step)
+                )
+              )(steps);
 
-            return [
+              return [
+                model,
+                receiveTransactionCmd(
+                  initializedEditorModel.initializableEditor.editor,
+                  parsedSteps,
+                  clientIds
+                ),
+              ];
+            })
+            .with({ _tag: "ComponentWillUnmount" }, () => [
               model,
-              receiveTransactionCmd(
-                initializedEditorModel.initializableEditor.editor,
-                parsedSteps,
-                clientIds
+              destroyEditorCmd(
+                initializedEditorModel.initializableEditor.editor
               ),
-            ];
-          })
-          .with({ _tag: "ComponentWillUnmount" }, () => [
-            model,
-            destroyEditorCmd(initializedEditorModel.initializableEditor.editor),
-          ])
-          .exhaustive()
-    )
-    .with(
-      [
-        { _tag: "GotInitializingEditorMsg" },
-        { initializableEditor: { _tag: "InitializingEditor" } },
-      ],
-      ([{ msg: initializingEditorMsg }, initializingEditorModel]) =>
-        match<InitializingEditorMsg, [Model, Cmd<Msg>]>(initializingEditorMsg)
-          .with({ _tag: "ComponentDidMount" }, () => [
-            model,
-            initializeEditorCmd({
-              clientId: initializingEditorModel.clientId,
-              doc: initializingEditorModel.initializableEditor.doc,
-              version: initializingEditorModel.initializableEditor.version,
-            }),
-          ])
-          .with(
-            { _tag: "EditorWasInitialized" },
-            ({ editor, subscriptionManager }) => [
-              {
-                ...initializingEditorModel,
-                initializableEditor: {
-                  _tag: "InitializedEditor",
-                  editor,
-                  subscriptionManager,
+            ])
+            .exhaustive()
+      )
+      .with(
+        [
+          { _tag: "GotInitializingEditorMsg" },
+          { initializableEditor: { _tag: "InitializingEditor" } },
+        ],
+        ([{ msg: initializingEditorMsg }, initializingEditorModel]) =>
+          match<InitializingEditorMsg, [Model, Cmd<Msg>]>(initializingEditorMsg)
+            .with({ _tag: "ComponentDidMount" }, () => [
+              model,
+              initializeEditorCmd({
+                clientId: initializingEditorModel.clientId,
+                doc: initializingEditorModel.initializableEditor.doc,
+                version: initializingEditorModel.initializableEditor.version,
+              }),
+            ])
+            .with(
+              { _tag: "EditorWasInitialized" },
+              ({ editor, subscriptionManager }) => [
+                {
+                  ...initializingEditorModel,
+                  initializableEditor: {
+                    _tag: "InitializedEditor",
+                    editor,
+                    subscriptionManager,
+                  },
                 },
-              },
-              cmd.none,
-            ]
-          )
-          .exhaustive()
-    )
-    .otherwise(() => [model, cmd.none]); // TODO: Error
+                cmd.none,
+              ]
+            )
+            .exhaustive()
+      )
+      .otherwise(() => [model, cmd.none]); // TODO: Error
 
 const receiveTransactionCmd: (
   editor: Editor,
@@ -227,32 +242,6 @@ const receiveTransactionCmd: (
         })
       ),
     cmdExtra.fromIOVoid
-  );
-
-const sendStepsCmd: (
-  sendSteps: any,
-  args: {
-    docId: Id<"docs">;
-    clientId: string;
-    version: number;
-    steps: Step[];
-  }
-) => Cmd<Msg> = (sendSteps, { docId, clientId, version, steps }) =>
-  pipe(
-    sendSteps(
-      docId,
-      clientId,
-      version,
-      steps.map((step: Step) => JSON.stringify(step.toJSON()))
-    ) as Task<null>,
-    task.map(
-      (): Option<Msg> =>
-        option.some({
-          _tag: "GotInitializedEditorMsg",
-          msg: { _tag: "StepsSent" },
-        })
-    ),
-    observable.of
   );
 
 const destroyEditorCmd = (editor: Editor): Cmd<never> =>
