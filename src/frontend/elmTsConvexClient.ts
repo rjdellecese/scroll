@@ -35,13 +35,7 @@ import * as cmdExtra from "~src/frontend/cmdExtra";
 export type ElmTsConvexClient<API extends GenericAPI> = {
   readonly internalConvexClient: InternalConvexClient;
   readonly latestUpdatedQueryResults: BehaviorSubject<QueryToken[]>;
-  readonly ioRefWatchedQueryResults: IORef<WatchedQueryResults<API>>;
 };
-
-type WatchedQueryResults<API extends GenericAPI> = Map<
-  QueryToken,
-  Subject<Option<ReturnType<NamedQuery<API, QueryNames<API>>>>>
->;
 
 export const init = <API extends GenericAPI>(): ElmTsConvexClient<API> => {
   const latestUpdatedQueryResults = new BehaviorSubject<QueryToken[]>([]);
@@ -50,11 +44,11 @@ export const init = <API extends GenericAPI>(): ElmTsConvexClient<API> => {
     internalConvexClient: new InternalConvexClient(
       clientConfig,
       (updatedWatchedQueries: QueryToken[]) => {
+        console.log("updatedQueryTokens", updatedWatchedQueries);
         latestUpdatedQueryResults.next(updatedWatchedQueries);
       }
     ),
     latestUpdatedQueryResults,
-    ioRefWatchedQueryResults: ioRef.newIORef(new Map())(),
   };
 };
 
@@ -102,22 +96,12 @@ export const watchQuery = <
             )
         )
         .exhaustive()
-    ),
-    rxFinalize(() => {
-      elmTsConvexClient.ioRefWatchedQueryResults.modify((watchedQueryResults) =>
-        map.deleteAt(string.Eq)(queryToken)(watchedQueryResults)
-      )();
-      unsubscribe();
-    })
+    )
   );
 
-  latestQueryResultObservable.subscribe(latestQueryResultSubject);
-
-  elmTsConvexClient.ioRefWatchedQueryResults.modify((watchedQueryResults) =>
-    map.upsertAt(string.Eq)(queryToken, latestQueryResultSubject)(
-      watchedQueryResults
-    )
-  )();
+  const latestQueryResultSubscription = latestQueryResultObservable.subscribe(
+    latestQueryResultSubject
+  );
 
   return latestQueryResultSubject.asObservable().pipe(
     rxMergeMap(
@@ -125,7 +109,11 @@ export const watchQuery = <
         () => rx.EMPTY,
         (result) => pipe(result, onResultChange, observable.of)
       )
-    )
+    ),
+    rxFinalize(() => {
+      latestQueryResultSubscription.unsubscribe();
+      unsubscribe();
+    })
   );
 };
 

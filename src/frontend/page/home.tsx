@@ -6,6 +6,7 @@ import type { QueryNames } from "convex/browser";
 import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
+import { Sub } from "elm-ts/lib/Sub";
 import { option, tuple } from "fp-ts";
 import { flow, hole, pipe } from "fp-ts/function";
 import * as React from "react";
@@ -65,7 +66,7 @@ export const update =
             doc: P.select("doc"),
             version: P.select("version"),
           },
-          P.any,
+          { _tag: "LoadingDoc" },
         ],
         ({ doc, version }) => [
           {
@@ -123,12 +124,26 @@ export const view: (model: Model) => Html<Msg> = (model: Model) =>
 export const subscriptions =
   (convexClient: elmTsConvexClient.ElmTsConvexClient<ConvexAPI>) =>
   (model: Model) =>
-    elmTsConvexClient.watchQuery(
-      convexClient,
-      ({ doc, version }): Msg => ({ _tag: "GotDocAndVersion", doc, version }),
-      "getDocAndVersion",
-      docId
-    );
+    match<Model, Sub<Msg>>(model)
+      .with({ _tag: "LoadingDoc" }, () =>
+        elmTsConvexClient.watchQuery(
+          convexClient,
+          ({ doc, version }): Msg => ({
+            _tag: "GotDocAndVersion",
+            doc,
+            version,
+          }),
+          "getDocAndVersion",
+          docId
+        )
+      )
+      .with({ _tag: "LoadedDoc" }, ({ editorModel }) =>
+        pipe(
+          editor.subscriptions(convexClient)(editorModel),
+          sub.map((editorMsg) => ({ _tag: "GotEditorMsg", msg: editorMsg }))
+        )
+      )
+      .exhaustive();
 
 // TODO: Remove
 const docId = new Id("docs", "X5vJ3yQ1NgeSr1SUNQZbQ1g");

@@ -19,6 +19,7 @@ import React from "react";
 import { match, P } from "ts-pattern";
 
 import type { Id } from "~src/backend/_generated/dataModel";
+import { ConvexAPI } from "~src/backend/_generated/react";
 import * as cmdExtra from "~src/frontend/cmdExtra";
 import type {
   SubscriptionInterop,
@@ -26,9 +27,9 @@ import type {
 } from "~src/frontend/subscriptionManager";
 import * as subscriptionManager from "~src/frontend/subscriptionManager";
 import { extensions } from "~src/tiptapSchemaExtensions";
+
 import * as elmTsConvexClient from "./elmTsConvexClient";
 import { ElmTsConvexClient } from "./elmTsConvexClient";
-import { ConvexAPI } from "~src/backend/_generated/react";
 
 // MODEL
 
@@ -143,6 +144,8 @@ export const update =
               const sendableSteps = collab.sendableSteps(
                 initializedEditorModel.initializableEditor.editor.state
               );
+
+              console.log("sendableSteps", sendableSteps);
 
               return match<
                 ReturnType<typeof collab.sendableSteps>,
@@ -346,14 +349,34 @@ const editorId = (clientId: string): string => `editor-${clientId}`;
 
 // SUBSCRIPTIONS
 
-export const subscriptions: (model: Model) => Sub<Msg> = (model) =>
+export const subscriptions: (
+  convexClient: ElmTsConvexClient<ConvexAPI>
+) => (model: Model) => Sub<Msg> = (convexClient) => (model) =>
   match<Model, Sub<Msg>>(model)
     .with(
       { initializableEditor: { _tag: "InitializedEditor" } },
       (initializedEditorModel) =>
-        subscriptionManager.subscriptions(
-          initializedEditorModel.initializableEditor.subscriptionManager
-        )
+        sub.batch([
+          subscriptionManager.subscriptions(
+            initializedEditorModel.initializableEditor.subscriptionManager
+          ),
+          elmTsConvexClient.watchQuery(
+            convexClient,
+            ({ steps, clientIds }) => ({
+              _tag: "GotInitializedEditorMsg",
+              msg: {
+                _tag: "ReceivedSteps",
+                steps,
+                clientIds,
+              },
+            }),
+            "getStepsSince",
+            model.docId,
+            collab.getVersion(
+              initializedEditorModel.initializableEditor.editor.state
+            )
+          ),
+        ])
     )
     .with(
       { initializableEditor: { _tag: "InitializingEditor" } },
