@@ -1,3 +1,4 @@
+/* eslint-disable rxjs/finnish */
 import { cmd } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import { option, taskOption } from "fp-ts";

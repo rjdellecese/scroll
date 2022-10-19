@@ -10,8 +10,8 @@ export default query(
     const doc = await db.get(docId);
 
     if (doc === null) {
-      // TODO: Could throw instead…
-      throw "oops";
+      // TODO: We don't actually want to throw here, I don't think.
+      throw "Failed to find doc";
     }
 
     const version = await getVersion(db, doc._id);

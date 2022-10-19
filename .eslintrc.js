@@ -8,12 +8,15 @@ module.exports = {
   parserOptions: {
     ecmaVersion: "latest",
     sourceType: "module",
+    tsconfigRootDir: __dirname,
+    project: ["./tsconfig.json"],
   },
   plugins: [
     "@typescript-eslint",
     "fp-ts",
     "simple-import-sort",
     "no-type-assertion",
+    "rxjs",
   ],
   root: true,
   rules: {
@@ -29,6 +32,7 @@ module.exports = {
     "no-type-assertion/no-type-assertion": "warn",
     "no-unused-vars": "off",
     "no-redeclare": "off", // `fp-ts` relies on redeclarations for its implementation of higher-kinded types
+    "rxjs/finnish": "warn",
   },
   overrides: [
     {

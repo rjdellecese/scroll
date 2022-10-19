@@ -7,7 +7,7 @@ export default async (
 ): Promise<number> => {
   const stepsQuery = db
     .query("steps")
-    .withIndex("by_doc_id", (q) => q.eq("docId", docId));
+    .withIndex("by_doc_id_and_position", (q) => q.eq("docId", docId));
 
   const getVersion = async () => {
     let versionCounter = 0;

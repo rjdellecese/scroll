@@ -9,5 +9,5 @@ export default defineSchema({
     position: s.number(),
     step: s.string(),
     clientId: s.string(),
-  }).index("by_doc_id", ["docId"]),
+  }).index("by_doc_id_and_position", ["docId", "position"]),
 });

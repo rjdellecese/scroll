@@ -8,16 +8,10 @@ export default query(
     version: number
   ): Promise<{ steps: string[]; clientIds: string[] }> => {
     // TODO
-    // const steps = await db
-    //   .table("step")
-    //   .index("by_doc_id")
-    //   .range((q) => q.eq("docId", doc._id))
-    //   .filter((q) => q.gt(q.field("position"), version))
-    //   .collect();
     const steps = await db
       .query("steps")
-      .filter((q) =>
-        q.and(q.eq(q.field("docId"), docId), q.gt(q.field("position"), version))
+      .withIndex("by_doc_id_and_position", (q) =>
+        q.eq("docId", docId).gt("position", version)
       )
       .collect();
 
