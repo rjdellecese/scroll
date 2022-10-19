@@ -7,15 +7,11 @@ import type {
   QueryToken,
 } from "convex/browser";
 import { InternalConvexClient } from "convex/browser";
-import { cmd } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Sub } from "elm-ts/lib/Sub";
-import { array, io, ioRef, map, option, string, task, taskOption } from "fp-ts";
-import { flow, pipe } from "fp-ts/lib/function";
-import { IO } from "fp-ts/lib/IO";
-import type { IORef } from "fp-ts/lib/IORef";
+import { array, option, string, taskOption } from "fp-ts";
+import { pipe } from "fp-ts/lib/function";
 import type { Option } from "fp-ts/lib/Option";
-import { Task } from "fp-ts/lib/Task";
 import { observable } from "fp-ts-rxjs";
 import type { Observable } from "rxjs";
 import * as rx from "rxjs";
@@ -32,6 +28,7 @@ import * as cmdExtra from "~src/frontend/cmdExtra";
 
 // TODO: Use functions from `fp-ts-rxjs` in place of `rxjs` when possible (check `rxjs/**/*` imports)
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export type ElmTsConvexClient<API extends GenericAPI> = {
   readonly internalConvexClient: InternalConvexClient;
   readonly latestUpdatedQueryResults: BehaviorSubject<QueryToken[]>;
@@ -72,17 +69,18 @@ export const watchQuery = <
 
   const latestQueryResultObservable: Observable<
     Option<ReturnType<NamedQuery<API, Name>>>
-  > = elmTsConvexClient.latestUpdatedQueryResults.pipe(
-    rxFilter((updatedQueryTokens) =>
+  > = pipe(
+    elmTsConvexClient.latestUpdatedQueryResults,
+    observable.filter((updatedQueryTokens) =>
       array.exists((updatedQueryToken: QueryToken) =>
         string.Eq.equals(queryToken, updatedQueryToken)
       )(updatedQueryTokens)
     ),
-    rxMergeMap((updatedQueryTokens: QueryToken[]) =>
+    observable.chain((updatedQueryTokens: QueryToken[]) =>
       match<boolean, Observable<Option<ReturnType<NamedQuery<API, Name>>>>>(
         array.isEmpty(updatedQueryTokens)
       )
-        .with(true, () => rx.EMPTY)
+        .with(true, () => observable.getMonoid().empty)
         .with(
           false,
           (): Observable<Option<ReturnType<NamedQuery<API, Name>>>> =>
@@ -92,7 +90,7 @@ export const watchQuery = <
                 args
               ) as ReturnType<NamedQuery<API, Name>> | undefined,
               option.fromNullable,
-              (optionLatestQueryResult) => rx.of(optionLatestQueryResult)
+              observable.of
             )
         )
         .exhaustive()

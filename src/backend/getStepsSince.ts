@@ -14,8 +14,6 @@ export default query(
     //   .range((q) => q.eq("docId", doc._id))
     //   .filter((q) => q.gt(q.field("position"), version))
     //   .collect();
-    console.log("getStepsSince")
-
     const steps = await db
       .query("steps")
       .filter((q) =>

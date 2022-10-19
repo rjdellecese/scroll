@@ -1,4 +1,5 @@
-import { IO } from "fp-ts/lib/IO";
+import type { IO } from "fp-ts/lib/IO";
+
 import type { ConvexAPI } from "~src/backend/_generated/react";
 import type { ElmTsConvexClient } from "~src/frontend/elmTsConvexClient";
 import * as elmTsConvexClient from "~src/frontend/elmTsConvexClient";
