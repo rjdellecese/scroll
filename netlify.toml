@@ -1,0 +1,12 @@
+[build]
+  publish = "dist/"
+  command = "npx convex deploy && npm run build"
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+[[plugins]]
+  package = "@sentry/netlify-build-plugin"
+  [plugins.inputs]
+    sentryOrg = "rj-dellecese"
+    sentryProject = "forever-note"

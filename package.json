@@ -39,6 +39,8 @@
     "url": "^0.11.0"
   },
   "dependencies": {
+    "@sentry/browser": "^7.16.0",
+    "@sentry/tracing": "^7.16.0",
     "@tiptap/core": "^2.0.0-beta.199",
     "@tiptap/extension-placeholder": "^2.0.0-beta.199",
     "@tiptap/extension-underline": "^2.0.0-beta.199",
