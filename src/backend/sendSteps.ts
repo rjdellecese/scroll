@@ -14,10 +14,6 @@ export default mutation(
     clientPersistedVersion: number,
     steps: string[]
   ) => {
-    console.log("clientId", clientId);
-    console.log("clientPersistedVersion", clientPersistedVersion);
-    console.log("steps", steps.length);
-
     const doc = await db.get(docId);
 
     // TODO: Error?
@@ -27,7 +23,6 @@ export default mutation(
       const persistedVersion = await getVersion(db, doc._id);
 
       if (clientPersistedVersion !== persistedVersion) {
-        console.log("Versions are not equal.");
         return;
       }
 

@@ -32,7 +32,7 @@ type Page =
 
 export const locationToMsg = (location: Location): Msg => ({
   _tag: "RouteChanged",
-  route: route.fromLocation(location),
+  route: route.fromLocationPathname(location.pathname),
 });
 
 const routeToPageCmd = (route: Route): [Page, Cmd<Msg>] =>
@@ -49,9 +49,10 @@ const routeToPageCmd = (route: Route): [Page, Cmd<Msg>] =>
 
 export const init: (
   flags: Flags
-) => (location: Location) => [Model, Cmd<Msg>] = (flags) =>
-  flow(
-    route.fromLocation,
+) => (location: Location) => [Model, Cmd<Msg>] = (flags) => (location) =>
+  pipe(
+    location.pathname,
+    route.fromLocationPathname,
     routeToPageCmd,
     tuple.mapFst((page) => ({ convexClient: flags.convexClient, page }))
   );

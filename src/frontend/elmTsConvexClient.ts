@@ -11,11 +11,9 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Sub } from "elm-ts/lib/Sub";
 import { array, option, string, taskOption } from "fp-ts";
 import { pipe } from "fp-ts/lib/function";
-import type { Option } from "fp-ts/lib/Option";
 import { observable } from "fp-ts-rxjs";
-import type { Observable } from "rxjs";
 import * as rx from "rxjs";
-import { BehaviorSubject, Subject } from "rxjs";
+import { Subject } from "rxjs";
 import { finalize as rxFinalize } from "rxjs/operators";
 import { match } from "ts-pattern";
 
@@ -37,7 +35,6 @@ export const init = <API extends GenericAPI>(): ElmTsConvexClient<API> => {
     internalConvexClient: new InternalConvexClient(
       clientConfig,
       (updatedWatchedQueries: QueryToken[]) => {
-        console.log("updatedQueryTokens", updatedWatchedQueries);
         latestUpdatedQueryResults$.next(updatedWatchedQueries);
       }
     ),

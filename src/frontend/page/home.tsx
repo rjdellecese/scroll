@@ -44,19 +44,15 @@ export const update =
         model,
         elmTsConvexClient.runMutation(
           convexClient,
-          (result): Msg => {
-            console.log("result", result);
-            return {
-              _tag: "DocCreated",
-              docId: result.id,
-            };
-          },
+          (result): Msg => ({
+            _tag: "DocCreated",
+            docId: result.id,
+          }),
           "createEmptyDoc"
         ),
       ])
       .with([{ _tag: "DocCreated", docId: P.select() }, P.any], (docId) => {
         // TODO
-        console.log("docId", docId);
         return [model, cmd.none];
       })
       .with(

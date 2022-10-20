@@ -145,8 +145,6 @@ export const update =
                 initializedEditorModel.initializableEditor.editor.state
               );
 
-              console.log("sendableSteps", sendableSteps);
-
               return match<
                 ReturnType<typeof collab.sendableSteps>,
                 [Model, Cmd<Msg>]
