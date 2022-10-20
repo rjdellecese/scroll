@@ -7,7 +7,6 @@ export default query(
     docId: Id<"docs">,
     version: number
   ): Promise<{ steps: string[]; clientIds: string[] }> => {
-    // TODO
     const steps = await db
       .query("steps")
       .withIndex("by_doc_id_and_position", (q) =>
