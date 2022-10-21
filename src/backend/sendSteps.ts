@@ -19,7 +19,7 @@ export default mutation(
     // Create client if it doesn't exist
     const existingClient = await db
       .query("clients")
-      .filter((q) => q.eq(q.field("id"), clientId))
+      .withIndex("by_id", (q) => q.eq("id", clientId))
       .first();
     const persistedClientId = existingClient
       ? existingClient._id
