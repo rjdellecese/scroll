@@ -14,8 +14,6 @@ export default mutation(
     clientPersistedVersion: number,
     steps: string[]
   ) => {
-    const doc = await db.get(docId);
-
     // Create client if it doesn't exist
     const existingClient = await db
       .query("clients")
@@ -23,8 +21,11 @@ export default mutation(
       .first();
     const persistedClientId = existingClient
       ? existingClient._id
-      : await db.insert("clients", { id: clientId });
+      : await db.insert("clients", { id: clientId, latestKnownVersion: 0 });
 
+    // Get latest step for each
+
+    const doc = await db.get(docId);
     if (doc === null) {
       throw "Couldn't find doc";
     } else {
@@ -47,13 +48,17 @@ export default mutation(
             clientId: persistedClientId,
             position: persistedVersion + currentIndex + 1,
           });
-          // TODO: Handle error case better here
+          // TODO: Handle error case better here; probably throw
           return step.apply(currentDoc).doc || currentDoc;
         },
         parsedDoc
       );
 
-      await db.replace(doc._id, {
+      await db.patch(persistedClientId, {
+        latestKnownVersion: persistedVersion + parsedSteps.length,
+      });
+
+      await db.patch(doc._id, {
         doc: JSON.stringify(updatedParsedDoc.toJSON()),
       });
     }
