@@ -16,9 +16,17 @@ export default mutation(
   ) => {
     const doc = await db.get(docId);
 
-    // TODO: Error?
+    // Create client if it doesn't exist
+    const existingClient = await db
+      .query("clients")
+      .filter((q) => q.eq(q.field("id"), clientId))
+      .first();
+    const persistedClientId = existingClient
+      ? existingClient._id
+      : await db.insert("clients", { id: clientId });
+
     if (doc === null) {
-      return;
+      throw "Couldn't find doc";
     } else {
       const persistedVersion = await getVersion(db, doc._id);
 
@@ -36,7 +44,7 @@ export default mutation(
           void db.insert("steps", {
             docId: docId,
             step: steps[currentIndex],
-            clientId: clientId,
+            clientId: persistedClientId,
             position: persistedVersion + currentIndex + 1,
           });
           // TODO: Handle error case better here

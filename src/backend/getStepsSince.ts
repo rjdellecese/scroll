@@ -7,25 +7,42 @@ export default query(
     docId: Id<"docs">,
     version: number
   ): Promise<{ steps: string[]; clientIds: string[] }> => {
-    const steps = await db
+    const steps: Document<"steps">[] = await db
       .query("steps")
       .withIndex("by_doc_id_and_position", (q) =>
         q.eq("docId", docId).gt("position", version)
       )
       .collect();
 
-    return steps.reduce(
-      (
-        result: {
+    const getCliendId = async (step: Document<"steps">) => {
+      const client = await db.get(step.clientId);
+      if (client) {
+        return client.id;
+      } else {
+        throw "Client not found for step";
+      }
+    };
+
+    return await steps.reduce<
+      Promise<{
+        steps: Document<"steps">["step"][];
+        clientIds: Document<"clients">["id"][];
+      }>
+    >(
+      async (
+        resultPromise: Promise<{
           steps: Document<"steps">["step"][];
-          clientIds: Document<"steps">["clientId"][];
-        },
+          clientIds: Document<"clients">["id"][];
+        }>,
         step: Document<"steps">
-      ) => ({
-        steps: [...result.steps, step.step],
-        clientIds: [...result.clientIds, step.clientId],
-      }),
-      { steps: [], clientIds: [] }
+      ) => {
+        const clientId = await getCliendId(step);
+        return resultPromise.then((result) => ({
+          steps: [...result.steps, step.step],
+          clientIds: [...result.clientIds, clientId],
+        }));
+      },
+      Promise.resolve({ steps: [], clientIds: [] })
     );
   }
 );
