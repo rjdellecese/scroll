@@ -4,12 +4,10 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import { array, option, readonlyArray, task } from "fp-ts";
-import { flow, hole, pipe } from "fp-ts/function";
+import { nonEmptyArray, option, readonlyArray } from "fp-ts";
+import { flow, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
-import type { Option } from "fp-ts/Option";
-import type { Task } from "fp-ts/Task";
-import { observable } from "fp-ts-rxjs";
+import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import type { EditorState } from "prosemirror-state";
@@ -19,7 +17,7 @@ import React from "react";
 import { match, P } from "ts-pattern";
 
 import type { Id } from "~src/backend/_generated/dataModel";
-import { ConvexAPI } from "~src/backend/_generated/react";
+import type { ConvexAPI } from "~src/backend/_generated/react";
 import * as cmdExtra from "~src/frontend/cmdExtra";
 import type {
   SubscriptionInterop,
@@ -28,8 +26,8 @@ import type {
 import * as subscriptionManager from "~src/frontend/subscriptionManager";
 import { extensions } from "~src/tiptapSchemaExtensions";
 
+import type { ElmTsConvexClient } from "./elmTsConvexClient";
 import * as elmTsConvexClient from "./elmTsConvexClient";
-import { ElmTsConvexClient } from "./elmTsConvexClient";
 
 // MODEL
 
@@ -90,7 +88,10 @@ type InitializingEditorMsg =
 type InitializedEditorMsg =
   | { _tag: "EditorTransactionApplied"; editorState: EditorState }
   | { _tag: "StepsSent" }
-  | { _tag: "ReceivedSteps"; steps: string[]; clientIds: string[] }
+  | {
+      _tag: "ReceivedSteps";
+      steps: NonEmptyArray<{ step: string; clientId: string }>;
+    }
   | { _tag: "ComponentWillUnmount" };
 
 export const update =
@@ -187,28 +188,13 @@ export const update =
                 ])
                 .exhaustive();
             })
-            .with({ _tag: "ReceivedSteps" }, ({ steps, clientIds }) =>
-              match<boolean, [Model, Cmd<Msg>]>(array.isEmpty(steps))
-                .with(true, () => [model, cmd.none])
-                .with(false, () => {
-                  const parsedSteps = array.map<string, Step>((step) =>
-                    Step.fromJSON(
-                      initializedEditorModel.initializableEditor.editor.schema,
-                      JSON.parse(step)
-                    )
-                  )(steps);
-
-                  return [
-                    model,
-                    receiveTransactionCmd(
-                      initializedEditorModel.initializableEditor.editor,
-                      parsedSteps,
-                      clientIds
-                    ),
-                  ];
-                })
-                .exhaustive()
-            )
+            .with({ _tag: "ReceivedSteps" }, ({ steps }) => [
+              model,
+              receiveTransactionCmd(
+                initializedEditorModel.initializableEditor.editor,
+                steps
+              ),
+            ])
             .with({ _tag: "ComponentWillUnmount" }, () => [
               model,
               destroyEditorCmd(
@@ -252,10 +238,20 @@ export const update =
 
 const receiveTransactionCmd: (
   editor: Editor,
-  steps: Step[],
-  clientIds: string[]
-) => Cmd<Msg> = (editor, steps, clientIds) =>
-  pipe(
+  steps: NonEmptyArray<{ step: string; clientId: string }>
+) => Cmd<Msg> = (editor, steps_) => {
+  const { steps, clientIds } = nonEmptyArray.reduce<
+    { step: string; clientId: string },
+    { steps: Step[]; clientIds: string[] }
+  >({ steps: [], clientIds: [] }, (result, step) => ({
+    steps: [
+      ...result.steps,
+      Step.fromJSON(editor.schema, JSON.parse(step.step)),
+    ],
+    clientIds: [...result.clientIds, step.clientId],
+  }))(steps_);
+
+  return pipe(
     () =>
       editor.view.dispatch(
         collab.receiveTransaction(editor.state, steps, clientIds, {
@@ -264,6 +260,7 @@ const receiveTransactionCmd: (
       ),
     cmdExtra.fromIOVoid
   );
+};
 
 const destroyEditorCmd = (editor: Editor): Cmd<never> =>
   pipe(() => editor.destroy(), cmdExtra.fromIOVoid);
@@ -380,14 +377,16 @@ export const subscriptions: (
           ),
           elmTsConvexClient.watchQuery(
             convexClient,
-            ({ steps, clientIds }) => ({
-              _tag: "GotInitializedEditorMsg",
-              msg: {
-                _tag: "ReceivedSteps",
-                steps,
-                clientIds,
-              },
-            }),
+            flow(
+              nonEmptyArray.fromArray,
+              option.map((steps) => ({
+                _tag: "GotInitializedEditorMsg",
+                msg: {
+                  _tag: "ReceivedSteps",
+                  steps,
+                },
+              }))
+            ),
             "getStepsSince",
             model.docId,
             collab.getVersion(

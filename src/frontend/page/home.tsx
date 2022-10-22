@@ -9,6 +9,7 @@ import type { Html } from "elm-ts/lib/React";
 import { Sub } from "elm-ts/lib/Sub";
 import { option, tuple } from "fp-ts";
 import { flow, hole, pipe } from "fp-ts/function";
+import { Option } from "fp-ts/lib/Option";
 import * as React from "react";
 import { match, P } from "ts-pattern";
 
@@ -124,11 +125,12 @@ export const subscriptions =
       .with({ _tag: "LoadingDoc" }, () =>
         elmTsConvexClient.watchQuery(
           convexClient,
-          ({ doc, version }): Msg => ({
-            _tag: "GotDocAndVersion",
-            doc,
-            version,
-          }),
+          ({ doc, version }): Option<Msg> =>
+            option.some({
+              _tag: "GotDocAndVersion",
+              doc,
+              version,
+            }),
           "getDocAndVersion",
           docId
         )

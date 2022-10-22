@@ -6,7 +6,8 @@ export default query(
     { db },
     docId: Id<"docs">,
     version: number
-  ): Promise<{ steps: string[]; clientIds: string[] }> => {
+  ): Promise<{ step: string; clientId: string }[]> => {
+    // TODO: Don't return `steps` and `clientIds` in this weird split format; split only right before necessary (which is right before passing to the `collab.receiveTransaction` function!
     const steps: Document<"steps">[] = await db
       .query("steps")
       .withIndex("by_doc_id_and_position_from_and_position_to", (q) =>
@@ -24,25 +25,21 @@ export default query(
     };
 
     return await steps.reduce<
-      Promise<{
-        steps: Document<"steps">["step"][];
-        clientIds: Document<"clients">["clientId"][];
-      }>
-    >(
-      async (
-        resultPromise: Promise<{
-          steps: Document<"steps">["step"][];
-          clientIds: Document<"clients">["clientId"][];
-        }>,
-        step: Document<"steps">
-      ) => {
-        const clientId = await getCliendId(step);
-        return resultPromise.then((result) => ({
-          steps: [...result.steps, step.step],
-          clientIds: [...result.clientIds, clientId],
-        }));
-      },
-      Promise.resolve({ steps: [], clientIds: [] })
-    );
+      Promise<
+        {
+          step: Document<"steps">["step"];
+          clientId: Document<"clients">["clientId"];
+        }[]
+      >
+    >(async (resultPromise, step) => {
+      const clientId = await getCliendId(step);
+      return resultPromise.then((result) => [
+        ...result,
+        {
+          step: step.step,
+          clientId: clientId,
+        },
+      ]);
+    }, Promise.resolve([]));
   }
 );

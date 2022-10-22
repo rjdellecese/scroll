@@ -11,8 +11,8 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Sub } from "elm-ts/lib/Sub";
 import { array, option, string, taskOption } from "fp-ts";
 import { pipe } from "fp-ts/lib/function";
+import type { Option } from "fp-ts/lib/Option";
 import { observable } from "fp-ts-rxjs";
-import * as rx from "rxjs";
 import { Subject } from "rxjs";
 import { finalize as rxFinalize } from "rxjs/operators";
 import { match } from "ts-pattern";
@@ -48,7 +48,7 @@ export const watchQuery = <
   Msg
 >(
   elmTsConvexClient: ElmTsConvexClient<API>,
-  onResultChange: (result: ReturnType<NamedQuery<API, Name>>) => Msg,
+  onResultChange: (result: ReturnType<NamedQuery<API, Name>>) => Option<Msg>,
   name: Name,
   ...args: Parameters<NamedQuery<API, Name>>
 ): Sub<Msg> => {
@@ -75,10 +75,8 @@ export const watchQuery = <
                 args
               ) as ReturnType<NamedQuery<API, Name>> | undefined,
               option.fromNullable,
-              option.match(
-                () => rx.EMPTY,
-                (result) => pipe(result, onResultChange, observable.of)
-              )
+              option.chain(onResultChange),
+              option.match(observable.zero<Msg>, observable.of)
             )
         )
         .exhaustive()
