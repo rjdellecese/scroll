@@ -116,7 +116,22 @@ export const update =
                       ReturnType<typeof collab.sendableSteps>,
                       [Model, Cmd<Msg>]
                     >(sendableSteps)
-                      .with(null, () => [model, cmd.none])
+                      .with(null, () => [
+                        model,
+                        // We send an empty list of steps here just to ensure that the server knows the client's latest known version
+                        elmTsConvexClient.runMutation(
+                          convexClient,
+                          () => ({
+                            _tag: "GotInitializedEditorMsg",
+                            msg: { _tag: "StepsSent" },
+                          }),
+                          "sendSteps",
+                          model.docId,
+                          model.clientId,
+                          collab.getVersion(editorState),
+                          []
+                        ),
+                      ])
                       .with(P.not(null), ({ version, steps }) => [
                         Lens.fromProp<Model>()("areStepsInFlight").set(true)(
                           model
@@ -172,23 +187,28 @@ export const update =
                 ])
                 .exhaustive();
             })
-            .with({ _tag: "ReceivedSteps" }, ({ steps, clientIds }) => {
-              const parsedSteps = array.map<string, Step>((step) =>
-                Step.fromJSON(
-                  initializedEditorModel.initializableEditor.editor.schema,
-                  JSON.parse(step)
-                )
-              )(steps);
+            .with({ _tag: "ReceivedSteps" }, ({ steps, clientIds }) =>
+              match<boolean, [Model, Cmd<Msg>]>(array.isEmpty(steps))
+                .with(true, () => [model, cmd.none])
+                .with(false, () => {
+                  const parsedSteps = array.map<string, Step>((step) =>
+                    Step.fromJSON(
+                      initializedEditorModel.initializableEditor.editor.schema,
+                      JSON.parse(step)
+                    )
+                  )(steps);
 
-              return [
-                model,
-                receiveTransactionCmd(
-                  initializedEditorModel.initializableEditor.editor,
-                  parsedSteps,
-                  clientIds
-                ),
-              ];
-            })
+                  return [
+                    model,
+                    receiveTransactionCmd(
+                      initializedEditorModel.initializableEditor.editor,
+                      parsedSteps,
+                      clientIds
+                    ),
+                  ];
+                })
+                .exhaustive()
+            )
             .with({ _tag: "ComponentWillUnmount" }, () => [
               model,
               destroyEditorCmd(

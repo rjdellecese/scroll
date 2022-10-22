@@ -11,19 +11,20 @@ export default mutation(
     { db },
     docId: Id<"docs">,
     clientId: string,
-    clientPersistedVersion: number,
+    clientLatestKnownVersion: number,
     steps: string[]
   ) => {
     // Create client if it doesn't exist
     const existingClient = await db
       .query("clients")
-      .withIndex("by_id", (q) => q.eq("id", clientId))
+      .withIndex("by_client_id", (q) => q.eq("clientId", clientId))
       .first();
     const persistedClientId = existingClient
       ? existingClient._id
-      : await db.insert("clients", { id: clientId, latestKnownVersion: 0 });
-
-    // Get latest step for each
+      : await db.insert("clients", {
+          clientId: clientId,
+          latestKnownVersion: 0,
+        });
 
     const doc = await db.get(docId);
     if (doc === null) {
@@ -31,7 +32,7 @@ export default mutation(
     } else {
       const persistedVersion = await getVersion(db, doc._id);
 
-      if (clientPersistedVersion !== persistedVersion) {
+      if (clientLatestKnownVersion !== persistedVersion) {
         return;
       }
 
@@ -46,7 +47,8 @@ export default mutation(
             docId: docId,
             step: steps[currentIndex],
             clientId: persistedClientId,
-            position: persistedVersion + currentIndex + 1,
+            positionFrom: persistedVersion + currentIndex + 1,
+            positionTo: persistedVersion + currentIndex + 1,
           });
           // TODO: Handle error case better here; probably throw
           return step.apply(currentDoc).doc || currentDoc;
@@ -58,9 +60,11 @@ export default mutation(
         latestKnownVersion: persistedVersion + parsedSteps.length,
       });
 
-      await db.patch(doc._id, {
-        doc: JSON.stringify(updatedParsedDoc.toJSON()),
-      });
+      if (parsedSteps.length > 0) {
+        await db.patch(doc._id, {
+          doc: JSON.stringify(updatedParsedDoc.toJSON()),
+        });
+      }
     }
   }
 );
