@@ -9,7 +9,7 @@ import type {
 import { InternalConvexClient } from "convex/browser";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Sub } from "elm-ts/lib/Sub";
-import { array, option, string, taskOption } from "fp-ts";
+import { array, option, string, task } from "fp-ts";
 import { pipe } from "fp-ts/lib/function";
 import type { Option } from "fp-ts/lib/Option";
 import { observable } from "fp-ts-rxjs";
@@ -90,7 +90,7 @@ export const runMutation = <
   Msg
 >(
   elmTsConvexClient: ElmTsConvexClient<API>,
-  onComplete: (result: ReturnType<NamedMutation<API, Name>>) => Msg,
+  onComplete: (result: ReturnType<NamedMutation<API, Name>>) => Option<Msg>,
   name: Name,
   ...args: Parameters<NamedMutation<API, Name>>
 ): Cmd<Msg> =>
@@ -100,7 +100,6 @@ export const runMutation = <
       elmTsConvexClient.internalConvexClient.mutate(name, args) as Promise<
         ReturnType<NamedMutation<API, Name>>
       >,
-    taskOption.fromTask,
-    observable.of,
-    cmdExtra.map(onComplete)
+    task.map(onComplete),
+    observable.of
   );

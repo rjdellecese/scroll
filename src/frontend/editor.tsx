@@ -124,10 +124,11 @@ export const update =
                         ),
                         elmTsConvexClient.runMutation(
                           convexClient,
-                          () => ({
-                            _tag: "GotInitializedEditorMsg",
-                            msg: { _tag: "StepsSent" },
-                          }),
+                          () =>
+                            option.some({
+                              _tag: "GotInitializedEditorMsg",
+                              msg: { _tag: "StepsSent" },
+                            }),
                           "sendSteps",
                           model.docId,
                           model.clientId,
@@ -158,10 +159,11 @@ export const update =
                   Lens.fromProp<Model>()("areStepsInFlight").set(true)(model),
                   elmTsConvexClient.runMutation(
                     convexClient,
-                    () => ({
-                      _tag: "GotInitializedEditorMsg",
-                      msg: { _tag: "StepsSent" },
-                    }),
+                    () =>
+                      option.some({
+                        _tag: "GotInitializedEditorMsg",
+                        msg: { _tag: "StepsSent" },
+                      }),
                     "sendSteps",
                     model.docId,
                     model.clientId,

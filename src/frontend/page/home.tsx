@@ -1,19 +1,13 @@
-import { Editor } from "@tiptap/core";
-import Placeholder from "@tiptap/extension-placeholder";
-import Underline from "@tiptap/extension-underline";
-import StarterKit from "@tiptap/starter-kit";
-import type { QueryNames } from "convex/browser";
 import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
-import { Sub } from "elm-ts/lib/Sub";
+import type { Sub } from "elm-ts/lib/Sub";
 import { option, tuple } from "fp-ts";
-import { flow, hole, pipe } from "fp-ts/function";
-import { Option } from "fp-ts/lib/Option";
+import { flow, pipe } from "fp-ts/function";
+import type { Option } from "fp-ts/lib/Option";
 import * as React from "react";
 import { match, P } from "ts-pattern";
 
-import * as cmdExtra from "~/src/frontend/cmdExtra";
 import { Id } from "~src/backend/_generated/dataModel";
 import type { ConvexAPI } from "~src/backend/_generated/react";
 import * as editor from "~src/frontend/editor";
@@ -45,10 +39,11 @@ export const update =
         model,
         elmTsConvexClient.runMutation(
           convexClient,
-          (result): Msg => ({
-            _tag: "DocCreated",
-            docId: result.id,
-          }),
+          (result) =>
+            option.some({
+              _tag: "DocCreated",
+              docId: result.id,
+            }),
           "createEmptyDoc"
         ),
       ])
