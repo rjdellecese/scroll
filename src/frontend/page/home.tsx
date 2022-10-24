@@ -115,28 +115,33 @@ export const view: (model: Model) => Html<Msg> = (model: Model) =>
 
 export const subscriptions =
   (convexClient: elmTsConvexClient.ElmTsConvexClient<ConvexAPI>) =>
-  (model: Model) =>
-    match<Model, Sub<Msg>>(model)
-      .with({ _tag: "LoadingDoc" }, () =>
-        elmTsConvexClient.watchQuery(
-          convexClient,
-          ({ doc, version }): Option<Msg> =>
-            option.some({
-              _tag: "GotDocAndVersion",
-              doc,
-              version,
-            }),
-          "getDocAndVersion",
-          docId
-        )
-      )
+  (model: Model) => {
+    // TODO Revert this whole function
+    const getDocAndVersionSub = elmTsConvexClient.watchQuery(
+      convexClient,
+      ({ doc, version }): Option<Msg> =>
+        option.some({
+          _tag: "GotDocAndVersion",
+          doc,
+          version,
+        }),
+      "getDocAndVersion",
+      docId
+    );
+
+    return match<Model, Sub<Msg>>(model)
+      .with({ _tag: "LoadingDoc" }, () => getDocAndVersionSub)
       .with({ _tag: "LoadedDoc" }, ({ editorModel }) =>
-        pipe(
-          editor.subscriptions(convexClient)(editorModel),
-          sub.map((editorMsg) => ({ _tag: "GotEditorMsg", msg: editorMsg }))
-        )
+        sub.batch([
+          getDocAndVersionSub,
+          pipe(
+            editor.subscriptions(convexClient)(editorModel),
+            sub.map((editorMsg) => ({ _tag: "GotEditorMsg", msg: editorMsg }))
+          ),
+        ])
       )
       .exhaustive();
+  };
 
 // TODO: Remove
 const docId = new Id("docs", "P0Yf4Ea3jkfK9Sn8hBT8CHe");

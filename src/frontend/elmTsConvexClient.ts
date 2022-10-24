@@ -28,6 +28,7 @@ export type ElmTsConvexClient<API extends GenericAPI> = {
   readonly latestUpdatedQueryResults$: Subject<QueryToken[]>;
 };
 
+// TODO: Make this idempotent by memoization.
 export const init = <API extends GenericAPI>(): ElmTsConvexClient<API> => {
   const latestUpdatedQueryResults$ = new Subject<QueryToken[]>();
 

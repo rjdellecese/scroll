@@ -1,8 +1,8 @@
 import { describe, expect, test } from "@jest/globals";
-import { Location } from "elm-ts/lib/Navigation";
+import type { Arbitrary } from "fast-check";
 import * as fc from "fast-check";
-import { Arbitrary } from "fast-check";
-import { array, option, predicate, string, tuple } from "fp-ts";
+import { array, string } from "fp-ts";
+
 import { fromLocationPathname } from "./route";
 
 describe("router", () => {

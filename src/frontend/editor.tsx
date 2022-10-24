@@ -87,7 +87,7 @@ type InitializingEditorMsg =
 
 type InitializedEditorMsg =
   | { _tag: "EditorTransactionApplied"; editorState: EditorState }
-  | { _tag: "StepsSent" }
+  | { _tag: "StepsSent"; result: "Accepted" | "Rejected" }
   | {
       _tag: "ReceivedSteps";
       steps: NonEmptyArray<{ step: string; clientId: string }>;
@@ -124,10 +124,10 @@ export const update =
                         ),
                         elmTsConvexClient.runMutation(
                           convexClient,
-                          () =>
+                          ({ _tag }) =>
                             option.some({
                               _tag: "GotInitializedEditorMsg",
-                              msg: { _tag: "StepsSent" },
+                              msg: { _tag: "StepsSent", result: _tag },
                             }),
                           "sendSteps",
                           model.docId,
@@ -142,39 +142,48 @@ export const update =
                   })
                   .exhaustive()
             )
-            .with({ _tag: "StepsSent" }, () => {
-              const sendableSteps = collab.sendableSteps(
-                initializedEditorModel.initializableEditor.editor.state
-              );
+            .with({ _tag: "StepsSent" }, ({ result }) =>
+              match<"Accepted" | "Rejected", [Model, Cmd<Msg>]>(result)
+                .with("Accepted", () => {
+                  const sendableSteps = collab.sendableSteps(
+                    initializedEditorModel.initializableEditor.editor.state
+                  );
 
-              return match<
-                ReturnType<typeof collab.sendableSteps>,
-                [Model, Cmd<Msg>]
-              >(sendableSteps)
-                .with(null, () => [
-                  Lens.fromProp<Model>()("areStepsInFlight").set(false)(model),
-                  cmd.none,
-                ])
-                .with(P.not(null), ({ version, steps }) => [
-                  Lens.fromProp<Model>()("areStepsInFlight").set(true)(model),
-                  elmTsConvexClient.runMutation(
-                    convexClient,
-                    () =>
-                      option.some({
-                        _tag: "GotInitializedEditorMsg",
-                        msg: { _tag: "StepsSent" },
-                      }),
-                    "sendSteps",
-                    model.docId,
-                    model.clientId,
-                    version,
-                    readonlyArray
-                      .toArray(steps)
-                      .map((step: Step) => JSON.stringify(step.toJSON()))
-                  ),
-                ])
-                .exhaustive();
-            })
+                  return match<
+                    ReturnType<typeof collab.sendableSteps>,
+                    [Model, Cmd<Msg>]
+                  >(sendableSteps)
+                    .with(null, () => [
+                      Lens.fromProp<Model>()("areStepsInFlight").set(false)(
+                        model
+                      ),
+                      cmd.none,
+                    ])
+                    .with(P.not(null), ({ version, steps }) => [
+                      Lens.fromProp<Model>()("areStepsInFlight").set(true)(
+                        model
+                      ),
+                      elmTsConvexClient.runMutation(
+                        convexClient,
+                        ({ _tag }) =>
+                          option.some({
+                            _tag: "GotInitializedEditorMsg",
+                            msg: { _tag: "StepsSent", result: _tag },
+                          }),
+                        "sendSteps",
+                        model.docId,
+                        model.clientId,
+                        version,
+                        readonlyArray
+                          .toArray(steps)
+                          .map((step: Step) => JSON.stringify(step.toJSON()))
+                      ),
+                    ])
+                    .exhaustive();
+                })
+                .with("Rejected", () => [model, cmd.none])
+                .exhaustive()
+            )
             .with({ _tag: "ReceivedSteps" }, ({ steps }) => [
               model,
               receiveTransactionCmd(
@@ -237,6 +246,8 @@ const receiveTransactionCmd: (
     ],
     clientIds: [...result.clientIds, step.clientId],
   }))(steps_);
+
+  console.log("steps_", steps_);
 
   return pipe(
     () =>
