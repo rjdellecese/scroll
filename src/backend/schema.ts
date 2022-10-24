@@ -6,7 +6,7 @@ export default defineSchema({
   }),
   clients: defineTable({
     id: s.string(),
-  }).index("by_id", ["id"]),
+  }),
   steps: defineTable({
     docId: s.id("docs"),
     clientId: s.id("clients"),
