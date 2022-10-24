@@ -10,15 +10,15 @@ export default query(
     // TODO: Don't return `steps` and `clientIds` in this weird split format; split only right before necessary (which is right before passing to the `collab.receiveTransaction` function!
     const steps: Document<"steps">[] = await db
       .query("steps")
-      .withIndex("by_doc_id_and_position_from_and_position_to", (q) =>
-        q.eq("docId", docId).gt("positionFrom", version)
+      .withIndex("by_doc_id_and_position", (q) =>
+        q.eq("docId", docId).gt("position", version)
       )
       .collect();
 
     const getCliendId = async (step: Document<"steps">) => {
       const client = await db.get(step.clientId);
       if (client) {
-        return client.clientId;
+        return client.id;
       } else {
         throw "Client not found for step";
       }

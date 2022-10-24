@@ -117,22 +117,7 @@ export const update =
                       ReturnType<typeof collab.sendableSteps>,
                       [Model, Cmd<Msg>]
                     >(sendableSteps)
-                      .with(null, () => [
-                        model,
-                        // We send an empty list of steps here just to ensure that the server knows the client's latest known version
-                        elmTsConvexClient.runMutation(
-                          convexClient,
-                          () => ({
-                            _tag: "GotInitializedEditorMsg",
-                            msg: { _tag: "StepsSent" },
-                          }),
-                          "sendSteps",
-                          model.docId,
-                          model.clientId,
-                          collab.getVersion(editorState),
-                          []
-                        ),
-                      ])
+                      .with(null, () => [model, cmd.none])
                       .with(P.not(null), ({ version, steps }) => [
                         Lens.fromProp<Model>()("areStepsInFlight").set(true)(
                           model
