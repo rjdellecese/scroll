@@ -15,29 +15,19 @@ export default query(
       )
       .collect();
 
-    const getCliendId = async (step: Document<"steps">) => {
-      const client = await db.get(step.clientId);
-      if (client) {
-        return client.id;
-      } else {
-        throw "Client not found for step";
-      }
-    };
-
     return await steps.reduce<
       Promise<
         {
           step: Document<"steps">["step"];
-          clientId: Document<"clients">["clientId"];
+          clientId: Document<"steps">["clientId"];
         }[]
       >
     >(async (resultPromise, step) => {
-      const clientId = await getCliendId(step);
       return resultPromise.then((result) => [
         ...result,
         {
           step: step.step,
-          clientId: clientId,
+          clientId: step.clientId,
         },
       ]);
     }, Promise.resolve([]));
