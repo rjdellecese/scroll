@@ -3,7 +3,7 @@ import { ConvexProvider } from "convex/react";
 import { cmd, react as html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Location } from "elm-ts/lib/Navigation";
-import type { Html, Dom } from "elm-ts/lib/React";
+import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { tuple } from "fp-ts";
 import { apply, pipe } from "fp-ts/lib/function";

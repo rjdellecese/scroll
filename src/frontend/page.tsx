@@ -1,4 +1,4 @@
-import { ConvexReactClient } from "convex/react";
+import type { ConvexReactClient } from "convex/react";
 import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Location } from "elm-ts/lib/Navigation";
@@ -8,8 +8,8 @@ import { tuple } from "fp-ts";
 import { flow, pipe } from "fp-ts/function";
 import * as React from "react";
 import { match, P } from "ts-pattern";
-import { ConvexAPI } from "~src/backend/_generated/react";
 
+import type { ConvexAPI } from "~src/backend/_generated/react";
 import * as home from "~src/frontend/page/home";
 import type { Route } from "~src/frontend/route";
 import * as route from "~src/frontend/route";

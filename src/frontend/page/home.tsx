@@ -1,20 +1,21 @@
-import { NamedQuery } from "convex/browser";
-import { ConvexReactClient } from "convex/react";
+import type { NamedQuery } from "convex/browser";
+import type { ConvexReactClient } from "convex/react";
 import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { option, tuple } from "fp-ts";
 import { constVoid, flow, pipe } from "fp-ts/function";
-import { IO } from "fp-ts/lib/IO";
-import type { Option } from "fp-ts/lib/Option";
+import type { IO } from "fp-ts/lib/IO";
+import type { Dispatch } from "react";
 import * as React from "react";
 import { match, P } from "ts-pattern";
 
 import { Id } from "~src/backend/_generated/dataModel";
-import { ConvexAPI, useQuery } from "~src/backend/_generated/react";
+import type { ConvexAPI } from "~src/backend/_generated/react";
+import { useQuery } from "~src/backend/_generated/react";
 import * as editor from "~src/frontend/editor";
-import * as elmTsConvexClient from "~src/frontend/elmTsConvexClient";
+
 import { runMutation } from "../convexElmTs";
 
 // MODEl
@@ -94,33 +95,12 @@ export const update =
 
 // VIEW
 
-export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
+export const view: (model: Model) => Html<Msg> = (model) =>
   match<Model, Html<Msg>>(model)
     .with({ _tag: "LoadingDoc" }, () => (dispatch) => {
-      const onGotDocAndVersion =
-        ({
-          doc,
-          version,
-        }: ReturnType<NamedQuery<ConvexAPI, "getDocAndVersion">>): IO<void> =>
-        () =>
-          dispatch({
-            _tag: "GotDocAndVersion",
-            doc,
-            version,
-          });
-
-      const onCreateDocButtonClicked = () =>
-        dispatch({ _tag: "CreateDocButtonClicked" });
-
       const docId = fixedDocId;
 
-      return (
-        <LoadingDoc
-          onGotDocAndVersion={onGotDocAndVersion}
-          onCreateDocButtonClicked={onCreateDocButtonClicked}
-          docId={docId}
-        ></LoadingDoc>
-      );
+      return <LoadingDoc dispatch={dispatch} docId={docId}></LoadingDoc>;
     })
     .with(
       { _tag: "LoadedDoc", editorModel: P.select() },
@@ -129,17 +109,13 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
         html.map((editorMsg) => ({ _tag: "GotEditorMsg", msg: editorMsg }))
       )
     )
-    .exhaustive()(dispatch);
+    .exhaustive();
 
 const LoadingDoc = ({
-  onGotDocAndVersion,
-  onCreateDocButtonClicked,
+  dispatch,
   docId,
 }: {
-  onGotDocAndVersion: (
-    docAndVersion: ReturnType<NamedQuery<ConvexAPI, "getDocAndVersion">>
-  ) => IO<void>;
-  onCreateDocButtonClicked: IO<void>;
+  dispatch: Dispatch<Msg>;
   docId: Id<"docs">;
 }) => {
   const docAndVersion = option.fromNullable(
@@ -147,37 +123,40 @@ const LoadingDoc = ({
   );
 
   React.useEffect(
-    () => option.match(() => constVoid, onGotDocAndVersion)(docAndVersion)(),
-    [docAndVersion, onGotDocAndVersion]
+    () =>
+      pipe(
+        docAndVersion,
+        option.match(
+          () => constVoid,
+          ({
+              doc,
+              version,
+            }: ReturnType<
+              NamedQuery<ConvexAPI, "getDocAndVersion">
+            >): IO<void> =>
+            () =>
+              dispatch({
+                _tag: "GotDocAndVersion",
+                doc,
+                version,
+              })
+        )
+      )(),
+    [docAndVersion, dispatch]
   );
 
-  return <button onClick={() => onCreateDocButtonClicked()}>Create doc</button>;
+  return (
+    <button onClick={() => dispatch({ _tag: "CreateDocButtonClicked" })}>
+      Create doc
+    </button>
+  );
 };
 
 // SUBSCRIPTIONS
 
 export const subscriptions = (model: Model) => {
-  // TODO Revert this whole function
-  // const getDocAndVersionSub = elmTsConvexClient.watchQuery(
-  //   convexClient,
-  //   ({ doc, version }): Option<Msg> =>
-  //     option.some({
-  //       _tag: "GotDocAndVersion",
-  //       doc,
-  //       version,
-  //     }),
-  //   "getDocAndVersion",
-  //   docId
-  // );
-
   return match<Model, Sub<Msg>>(model)
-    .with(
-      { _tag: "LoadingDoc" },
-      () =>
-        // TODO
-        // getDocAndVersionSub
-        sub.none
-    )
+    .with({ _tag: "LoadingDoc" }, () => sub.none)
     .with({ _tag: "LoadedDoc" }, ({ editorModel }) =>
       pipe(
         editor.subscriptions(editorModel),

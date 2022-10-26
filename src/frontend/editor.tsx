@@ -1,4 +1,4 @@
-import { Editor, Extension } from "@tiptap/core";
+import { Editor as TiptapEditor, Extension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import type { ConvexReactClient } from "convex/react";
 import type { Cmd } from "elm-ts/lib/Cmd";
@@ -48,7 +48,7 @@ type InitializableEditor =
     }
   | {
       _tag: "InitializedEditor";
-      editor: Editor;
+      editor: TiptapEditor;
       callbackManager: CallbackManager<Msg>;
     };
 
@@ -82,7 +82,7 @@ type InitializingEditorMsg =
   | { _tag: "ComponentDidMount" }
   | {
       _tag: "EditorWasInitialized";
-      editor: Editor;
+      editor: TiptapEditor;
       callbackManager: CallbackManager<Msg>;
     };
 
@@ -221,7 +221,7 @@ export const update =
       .otherwise(() => [model, cmd.none]); // TODO: Error
 
 const receiveTransactionCmd: (
-  editor: Editor,
+  editor: TiptapEditor,
   steps: NonEmptyArray<{ step: string; clientId: string }>
 ) => Cmd<Msg> = (editor, steps_) => {
   const { steps, clientIds } = nonEmptyArray.reduce<
@@ -246,7 +246,7 @@ const receiveTransactionCmd: (
   );
 };
 
-const destroyEditorCmd = (editor: Editor): Cmd<never> =>
+const destroyEditorCmd = (editor: TiptapEditor): Cmd<never> =>
   pipe(() => editor.destroy(), cmdExtra.fromIOVoid);
 
 const initializeEditorCmd = ({
@@ -275,7 +275,7 @@ const initializeEditorCmd = ({
               _tag: "GotInitializingEditorMsg",
               msg: {
                 _tag: "EditorWasInitialized",
-                editor: new Editor({
+                editor: new TiptapEditor({
                   element: htmlElement,
                   content: JSON.parse(doc) as string,
                   extensions: [
@@ -328,32 +328,21 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) => {
   const clientId = model.clientId;
 
   return (
-    <EditorContent
-      // onMount={onMount}
-      // onUnmount={onUnmount}
-      // onGotStepsSince={onGotStepsSince}
+    <Editor
       dispatch={dispatch}
       docId={docId}
       clientId={clientId}
       version={version}
-    ></EditorContent>
+    ></Editor>
   );
 };
 
-const EditorContent = ({
-  // onMount,
-  // onUnmount,
-  // onGotStepsSince,
+const Editor = ({
   dispatch,
   docId,
   clientId,
   version,
 }: {
-  // onMount: IO<void>;
-  // onUnmount: IO<void>;
-  // onGotStepsSince: (
-  //   stepsSince: ReturnType<NamedQuery<ConvexAPI, "getStepsSince">>
-  // ) => IO<void>;
   dispatch: Dispatch<Msg>;
   docId: Id<"docs">;
   clientId: string;
@@ -399,7 +388,7 @@ const EditorContent = ({
       _tag: "GotInitializedEditorMsg",
       msg: { _tag: "ComponentWillUnmount" },
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return <div id={editorId(clientId)}></div>;
 };
