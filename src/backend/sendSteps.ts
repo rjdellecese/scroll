@@ -13,17 +13,16 @@ export default mutation(
     clientId: string,
     clientPersistedVersion: number,
     steps: string[]
-  ): Promise<{ _tag: "Accepted" } | { _tag: "Rejected" }> => {
+  ): Promise<void> => {
     const doc = await db.get(docId);
 
-    // TODO: Error?
     if (doc === null) {
       throw "Couldn't find doc";
     } else {
       const persistedVersion = await getVersion(db, doc._id);
 
       if (clientPersistedVersion !== persistedVersion) {
-        return { _tag: "Rejected" };
+        return;
       }
 
       const parsedSteps = steps.map((step) =>
@@ -48,8 +47,6 @@ export default mutation(
       await db.replace(doc._id, {
         doc: JSON.stringify(updatedParsedDoc.toJSON()),
       });
-
-      return { _tag: "Accepted" };
     }
   }
 );

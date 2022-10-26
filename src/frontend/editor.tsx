@@ -1,33 +1,34 @@
 import { Editor, Extension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
+import type { ConvexReactClient } from "convex/react";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { nonEmptyArray, option, readonlyArray } from "fp-ts";
-import { flow, pipe } from "fp-ts/function";
-import type { IO } from "fp-ts/lib/IO";
+import { constVoid, flow, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
+import type { Option } from "fp-ts/lib/Option";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import type { EditorState } from "prosemirror-state";
 import { Step } from "prosemirror-transform";
-import type { ReactElement } from "react";
+import type { Dispatch, ReactElement } from "react";
 import React from "react";
 import { match, P } from "ts-pattern";
 
 import type { Id } from "~src/backend/_generated/dataModel";
 import type { ConvexAPI } from "~src/backend/_generated/react";
-import * as cmdExtra from "~src/frontend/cmdExtra";
+import { useQuery } from "~src/backend/_generated/react";
 import type {
-  SubscriptionInterop,
-  SubscriptionManager,
-} from "~src/frontend/subscriptionManager";
-import * as subscriptionManager from "~src/frontend/subscriptionManager";
+  CallbackInterop,
+  CallbackManager,
+} from "~src/frontend/callbackManager";
+import * as callbackManager from "~src/frontend/callbackManager";
+import * as cmdExtra from "~src/frontend/cmdExtra";
 import { extensions } from "~src/tiptapSchemaExtensions";
 
-import type { ElmTsConvexClient } from "./elmTsConvexClient";
-import * as elmTsConvexClient from "./elmTsConvexClient";
+import { runMutation } from "./convexElmTs";
 
 // MODEL
 
@@ -48,7 +49,7 @@ type InitializableEditor =
   | {
       _tag: "InitializedEditor";
       editor: Editor;
-      subscriptionManager: SubscriptionManager<Msg>;
+      callbackManager: CallbackManager<Msg>;
     };
 
 export const init = ({
@@ -82,12 +83,12 @@ type InitializingEditorMsg =
   | {
       _tag: "EditorWasInitialized";
       editor: Editor;
-      subscriptionManager: SubscriptionManager<Msg>;
+      callbackManager: CallbackManager<Msg>;
     };
 
 type InitializedEditorMsg =
   | { _tag: "EditorTransactionApplied"; editorState: EditorState }
-  | { _tag: "StepsSent"; result: "Accepted" | "Rejected" }
+  | { _tag: "StepsSent" }
   | {
       _tag: "ReceivedSteps";
       steps: NonEmptyArray<{ step: string; clientId: string }>;
@@ -95,7 +96,7 @@ type InitializedEditorMsg =
   | { _tag: "ComponentWillUnmount" };
 
 export const update =
-  (convexClient: ElmTsConvexClient<ConvexAPI>) =>
+  (convex: ConvexReactClient<ConvexAPI>) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with(
@@ -122,14 +123,13 @@ export const update =
                         Lens.fromProp<Model>()("areStepsInFlight").set(true)(
                           model
                         ),
-                        elmTsConvexClient.runMutation(
-                          convexClient,
-                          ({ _tag }) =>
+                        runMutation(
+                          convex.mutation("sendSteps"),
+                          (): Option<Msg> =>
                             option.some({
                               _tag: "GotInitializedEditorMsg",
-                              msg: { _tag: "StepsSent", result: _tag },
+                              msg: { _tag: "StepsSent" },
                             }),
-                          "sendSteps",
                           model.docId,
                           model.clientId,
                           version,
@@ -142,46 +142,34 @@ export const update =
                   })
                   .exhaustive()
             )
-            .with({ _tag: "StepsSent" }, ({ result }) =>
-              match<"Accepted" | "Rejected", [Model, Cmd<Msg>]>(result)
-                .with("Accepted", () => {
-                  const sendableSteps = collab.sendableSteps(
-                    initializedEditorModel.initializableEditor.editor.state
-                  );
-
-                  return match<
-                    ReturnType<typeof collab.sendableSteps>,
-                    [Model, Cmd<Msg>]
-                  >(sendableSteps)
-                    .with(null, () => [
-                      Lens.fromProp<Model>()("areStepsInFlight").set(false)(
-                        model
-                      ),
-                      cmd.none,
-                    ])
-                    .with(P.not(null), ({ version, steps }) => [
-                      Lens.fromProp<Model>()("areStepsInFlight").set(true)(
-                        model
-                      ),
-                      elmTsConvexClient.runMutation(
-                        convexClient,
-                        ({ _tag }) =>
-                          option.some({
-                            _tag: "GotInitializedEditorMsg",
-                            msg: { _tag: "StepsSent", result: _tag },
-                          }),
-                        "sendSteps",
-                        model.docId,
-                        model.clientId,
-                        version,
-                        readonlyArray
-                          .toArray(steps)
-                          .map((step: Step) => JSON.stringify(step.toJSON()))
-                      ),
-                    ])
-                    .exhaustive();
-                })
-                .with("Rejected", () => [model, cmd.none])
+            .with({ _tag: "StepsSent" }, () =>
+              match<ReturnType<typeof collab.sendableSteps>, [Model, Cmd<Msg>]>(
+                collab.sendableSteps(
+                  initializedEditorModel.initializableEditor.editor.state
+                )
+              )
+                .with(null, () => [
+                  Lens.fromProp<Model>()("areStepsInFlight").set(false)(model),
+                  cmd.none,
+                ])
+                .with(P.not(null), ({ version, steps }) => [
+                  Lens.fromProp<Model>()("areStepsInFlight").set(true)(model),
+                  // TODO: Same `"stepsSent"` call, extract and share?
+                  runMutation(
+                    convex.mutation("sendSteps"),
+                    (): Option<Msg> =>
+                      option.some({
+                        _tag: "GotInitializedEditorMsg",
+                        msg: { _tag: "StepsSent" },
+                      }),
+                    model.docId,
+                    model.clientId,
+                    version,
+                    readonlyArray
+                      .toArray(steps)
+                      .map((step: Step) => JSON.stringify(step.toJSON()))
+                  ),
+                ])
                 .exhaustive()
             )
             .with({ _tag: "ReceivedSteps" }, ({ steps }) => [
@@ -216,13 +204,13 @@ export const update =
             ])
             .with(
               { _tag: "EditorWasInitialized" },
-              ({ editor, subscriptionManager }) => [
+              ({ editor, callbackManager }) => [
                 {
                   ...initializingEditorModel,
                   initializableEditor: {
                     _tag: "InitializedEditor",
                     editor,
-                    subscriptionManager,
+                    callbackManager,
                   },
                 },
                 cmd.none,
@@ -246,8 +234,6 @@ const receiveTransactionCmd: (
     ],
     clientIds: [...result.clientIds, step.clientId],
   }))(steps_);
-
-  console.log("steps_", steps_);
 
   return pipe(
     () =>
@@ -282,8 +268,8 @@ const initializeEditorCmd = ({
           // TODO: Report error
           () => cmd.none,
           (htmlElement) => {
-            const subscriptionInterop: SubscriptionInterop<Msg> =
-              subscriptionManager.manageSubscriptions<Msg>()();
+            const callbackInterop: CallbackInterop<Msg> =
+              callbackManager.manageCallbacks<Msg>()();
 
             return cmd.of<Msg>({
               _tag: "GotInitializingEditorMsg",
@@ -306,7 +292,7 @@ const initializeEditorCmd = ({
                     }),
                   ],
                   onTransaction: (props) => {
-                    subscriptionInterop.dispatch({
+                    callbackInterop.dispatch({
                       _tag: "GotInitializedEditorMsg",
                       msg: {
                         _tag: "EditorTransactionApplied",
@@ -315,7 +301,7 @@ const initializeEditorCmd = ({
                     })();
                   },
                 }),
-                subscriptionManager: subscriptionInterop.subscriptionManager,
+                callbackManager: callbackInterop.callbackManager,
               },
             });
           }
@@ -326,72 +312,110 @@ const initializeEditorCmd = ({
 
 // VIEW
 
-export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
-  (
+export const view: (model: Model) => Html<Msg> = (model) => (dispatch) => {
+  const version = match(model.initializableEditor)
+    .with(
+      { _tag: "InitializingEditor", version: P.select() },
+      (version) => version
+    )
+    .with({ _tag: "InitializedEditor", editor: P.select() }, (editor) =>
+      collab.getVersion(editor.state)
+    )
+    .exhaustive();
+
+  const docId = model.docId;
+
+  const clientId = model.clientId;
+
+  return (
     <EditorContent
-      onMount={() =>
-        dispatch({
-          _tag: "GotInitializingEditorMsg",
-          msg: { _tag: "ComponentDidMount" },
-        })
-      }
-      onUnmount={() =>
-        dispatch({
-          _tag: "GotInitializedEditorMsg",
-          msg: { _tag: "ComponentWillUnmount" },
-        })
-      }
-      clientId={model.clientId}
+      // onMount={onMount}
+      // onUnmount={onUnmount}
+      // onGotStepsSince={onGotStepsSince}
+      dispatch={dispatch}
+      docId={docId}
+      clientId={clientId}
+      version={version}
     ></EditorContent>
   );
+};
 
-const EditorContent = (props: {
-  onMount: IO<void>;
-  onUnmount: IO<void>;
+const EditorContent = ({
+  // onMount,
+  // onUnmount,
+  // onGotStepsSince,
+  dispatch,
+  docId,
+  clientId,
+  version,
+}: {
+  // onMount: IO<void>;
+  // onUnmount: IO<void>;
+  // onGotStepsSince: (
+  //   stepsSince: ReturnType<NamedQuery<ConvexAPI, "getStepsSince">>
+  // ) => IO<void>;
+  dispatch: Dispatch<Msg>;
+  docId: Id<"docs">;
   clientId: string;
+  version: number;
 }): ReactElement => {
+  const stepsSince = useQuery("getStepsSince", docId, version);
+
+  React.useEffect(
+    () =>
+      pipe(
+        stepsSince,
+        option.fromNullable,
+        option.match(
+          () => constVoid,
+          flow(
+            nonEmptyArray.fromArray,
+            option.map(
+              (steps): Msg => ({
+                _tag: "GotInitializedEditorMsg",
+                msg: {
+                  _tag: "ReceivedSteps",
+                  steps,
+                },
+              })
+            ),
+            option.match(
+              () => constVoid,
+              (msg) => () => dispatch(msg)
+            )
+          )
+        )
+      )(),
+    [stepsSince, dispatch]
+  );
+
   React.useEffect(() => {
-    props.onMount();
-    return props.onUnmount;
+    dispatch({
+      _tag: "GotInitializingEditorMsg",
+      msg: { _tag: "ComponentDidMount" },
+    });
+
+    return dispatch({
+      _tag: "GotInitializedEditorMsg",
+      msg: { _tag: "ComponentWillUnmount" },
+    });
   }, []);
 
-  return <div id={editorId(props.clientId)}></div>;
+  return <div id={editorId(clientId)}></div>;
 };
 
 const editorId = (clientId: string): string => `editor-${clientId}`;
 
 // SUBSCRIPTIONS
 
-export const subscriptions: (
-  convexClient: ElmTsConvexClient<ConvexAPI>
-) => (model: Model) => Sub<Msg> = (convexClient) => (model) =>
+export const subscriptions: (model: Model) => Sub<Msg> = (model) =>
   match<Model, Sub<Msg>>(model)
     .with(
       { initializableEditor: { _tag: "InitializedEditor" } },
       (initializedEditorModel) =>
-        sub.batch([
-          subscriptionManager.subscriptions(
-            initializedEditorModel.initializableEditor.subscriptionManager
-          ),
-          elmTsConvexClient.watchQuery(
-            convexClient,
-            flow(
-              nonEmptyArray.fromArray,
-              option.map((steps) => ({
-                _tag: "GotInitializedEditorMsg",
-                msg: {
-                  _tag: "ReceivedSteps",
-                  steps,
-                },
-              }))
-            ),
-            "getStepsSince",
-            model.docId,
-            collab.getVersion(
-              initializedEditorModel.initializableEditor.editor.state
-            )
-          ),
-        ])
+        callbackManager.subscriptions(
+          initializedEditorModel.initializableEditor.callbackManager
+        )
     )
     .with(
       { initializableEditor: { _tag: "InitializingEditor" } },

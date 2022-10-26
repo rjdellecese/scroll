@@ -1,3 +1,4 @@
+import { ConvexReactClient } from "convex/react";
 import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Location } from "elm-ts/lib/Navigation";
@@ -7,9 +8,8 @@ import { tuple } from "fp-ts";
 import { flow, pipe } from "fp-ts/function";
 import * as React from "react";
 import { match, P } from "ts-pattern";
+import { ConvexAPI } from "~src/backend/_generated/react";
 
-import type { ConvexAPI } from "~src/backend/_generated/react";
-import type { ElmTsConvexClient } from "~src/frontend/elmTsConvexClient";
 import * as home from "~src/frontend/page/home";
 import type { Route } from "~src/frontend/route";
 import * as route from "~src/frontend/route";
@@ -18,12 +18,7 @@ import type { Flags } from "./flags";
 
 // MODEL
 
-export type Model = {
-  convexClient: ElmTsConvexClient<ConvexAPI>;
-  page: Page;
-};
-
-type Page =
+export type Model =
   | {
       _tag: "Home";
       model: home.Model;
@@ -35,8 +30,8 @@ export const locationToMsg = (location: Location): Msg => ({
   route: route.fromLocationPathname(location.pathname),
 });
 
-const routeToPageCmd = (route: Route): [Page, Cmd<Msg>] =>
-  match<Route, [Page, Cmd<Msg>]>(route)
+const routeToModelCmd = (route: Route): [Model, Cmd<Msg>] =>
+  match<Route, [Model, Cmd<Msg>]>(route)
     .with({ _tag: "Home" }, () => [
       {
         _tag: "Home",
@@ -50,12 +45,7 @@ const routeToPageCmd = (route: Route): [Page, Cmd<Msg>] =>
 export const init: (
   flags: Flags
 ) => (location: Location) => [Model, Cmd<Msg>] = (flags) => (location) =>
-  pipe(
-    location.pathname,
-    route.fromLocationPathname,
-    routeToPageCmd,
-    tuple.mapFst((page) => ({ convexClient: flags.convexClient, page }))
-  );
+  pipe(location.pathname, route.fromLocationPathname, routeToModelCmd);
 
 // MESSAGES
 
@@ -65,9 +55,10 @@ export type Msg =
 
 // UPDATE
 
-export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
-  pipe(
-    match<[Msg, Page], [Page, Cmd<Msg>]>([msg, model.page])
+export const update =
+  (convex: ConvexReactClient<ConvexAPI>) =>
+  (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
+    match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with(
         [
           { _tag: "GotHomeMsg", msg: P.select("homeMsg") },
@@ -78,7 +69,7 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
         ],
         ({ homeMsg, homeModel }) =>
           pipe(
-            home.update(model.convexClient)(homeMsg, homeModel),
+            home.update(convex)(homeMsg, homeModel),
             tuple.bimap(
               cmd.map((homeMsg_) => ({ _tag: "GotHomeMsg", msg: homeMsg_ })),
               (homeModel_) => ({ _tag: "Home", model: homeModel_ })
@@ -87,16 +78,14 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
       )
       .with(
         [{ _tag: "RouteChanged", route: P.select() }, P.any],
-        routeToPageCmd
+        routeToModelCmd
       )
-      .otherwise(() => [model.page, cmd.none]),
-    tuple.mapFst((page) => ({ ...model, page }))
-  );
+      .otherwise(() => [model, cmd.none]);
 
 // VIEW
 
 export const view = (model: Model): Html<Msg> =>
-  match<Page, Html<Msg>>(model.page)
+  match<Model, Html<Msg>>(model)
     .with(
       { _tag: "Home", model: P.select() },
       flow(
@@ -114,7 +103,7 @@ const notFoundView: Html<Msg> = () => <div>Page not found!</div>;
 export const subscriptions: (model: Model) => Sub<Msg> = (
   model: Model
 ): Sub<Msg> =>
-  match<Page, Sub<Msg>>(model.page)
+  match<Model, Sub<Msg>>(model)
     .with(
       {
         _tag: "Home",
@@ -122,7 +111,7 @@ export const subscriptions: (model: Model) => Sub<Msg> = (
       },
       ({ homeModel }) =>
         pipe(
-          home.subscriptions(model.convexClient)(homeModel),
+          home.subscriptions(homeModel),
           sub.map((homeMsg) => ({ _tag: "GotHomeMsg", msg: homeMsg }))
         )
     )

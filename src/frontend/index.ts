@@ -5,9 +5,10 @@ import { programWithFlags } from "elm-ts/lib/Navigation";
 import * as React from "elm-ts/lib/React";
 import { render } from "react-dom";
 
+import * as app from "~/src/frontend/app";
 import * as flags from "~/src/frontend/flags";
-import * as page from "~/src/frontend/page";
 
+// TODO: Conditional based on environment, at least
 Sentry.init({
   dsn: "https://49a723076cc84925bfb2265827ca1270@o4504010981179392.ingest.sentry.io/4504010983604224",
   integrations: [new BrowserTracing()],
@@ -24,11 +25,11 @@ const program =
     : programWithDebuggerWithFlags;
 
 const main = program(
-  page.locationToMsg,
-  page.init,
-  page.update,
-  page.view,
-  page.subscriptions
+  app.locationToMsg,
+  app.init,
+  app.update,
+  app.view,
+  app.subscriptions
 );
 
 React.run(main(flags.init()), (dom) =>
