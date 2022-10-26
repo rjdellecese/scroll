@@ -8,7 +8,7 @@ import { option, tuple } from "fp-ts";
 import { constVoid, flow, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
 import type { Dispatch } from "react";
-import * as React from "react";
+import React from "react";
 import { match, P } from "ts-pattern";
 
 import { Id } from "~src/backend/_generated/dataModel";
