@@ -7,7 +7,6 @@ export default query(
     docId: Id<"docs">,
     version: number
   ): Promise<{ step: string; clientId: string }[]> => {
-    // TODO: Don't return `steps` and `clientIds` in this weird split format; split only right before necessary (which is right before passing to the `collab.receiveTransaction` function!
     const steps: Document<"steps">[] = await db
       .query("steps")
       .withIndex("by_doc_id_and_position", (q) =>

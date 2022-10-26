@@ -11,6 +11,7 @@ export default async (
 
   const getVersion = async () => {
     let versionCounter = 0;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for await (const _step of stepsQuery) {
       versionCounter += 1;
     }

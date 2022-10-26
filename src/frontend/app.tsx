@@ -12,9 +12,8 @@ import { match, P } from "ts-pattern";
 
 import clientConfig from "~src/backend/_generated/clientConfig";
 import type { ConvexAPI } from "~src/backend/_generated/react";
-import * as page from "~src/frontend/page";
-
-import type { Flags } from "./flags";
+import * as page from "~src/frontend/app/page";
+import type { Flags } from "~src/frontend/flags";
 
 // MODEL
 

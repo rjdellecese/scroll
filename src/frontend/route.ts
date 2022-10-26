@@ -1,4 +1,3 @@
-import type { Location } from "elm-ts/lib/Navigation";
 import * as r from "fp-ts-routing";
 
 export type Route = Home | NotFound;

@@ -10,11 +10,10 @@ import * as React from "react";
 import { match, P } from "ts-pattern";
 
 import type { ConvexAPI } from "~src/backend/_generated/react";
-import * as home from "~src/frontend/page/home";
+import type { Flags } from "~src/frontend/flags";
+import * as home from "~src/frontend/app/page/home";
 import type { Route } from "~src/frontend/route";
 import * as route from "~src/frontend/route";
-
-import type { Flags } from "./flags";
 
 // MODEL
 

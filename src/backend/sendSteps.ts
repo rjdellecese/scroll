@@ -31,15 +31,19 @@ export default mutation(
       const parsedDoc = Node.fromJSON(schema, JSON.parse(doc.doc));
       const updatedParsedDoc = parsedSteps.reduce(
         (currentDoc, step, currentIndex) => {
-          // TODO: Not sure `void` is actually what we want here.
-          void db.insert("steps", {
+          db.insert("steps", {
             docId: docId,
             step: steps[currentIndex],
             clientId: clientId,
             position: persistedVersion + currentIndex + 1,
           });
-          // TODO: Handle error case better here
-          return step.apply(currentDoc).doc || currentDoc;
+
+          const nextDoc = step.apply(currentDoc).doc;
+          if (nextDoc) {
+            return nextDoc;
+          } else {
+            throw "Failed to apply step";
+          }
         },
         parsedDoc
       );
