@@ -5,13 +5,12 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import { nonEmptyArray, option, readonlyArray } from "fp-ts";
+import { io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
 import { constVoid, flow, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
-import type { EditorState } from "prosemirror-state";
 import { Step } from "prosemirror-transform";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
@@ -32,25 +31,24 @@ import { runMutation } from "./convexElmTs";
 
 // MODEL
 
-export type Model = {
-  initializableEditor: InitializableEditor;
+export type Model = InitializingEditorModel | InitializedEditorModel;
+
+type InitializingEditorModel = {
+  _tag: "InitializingEditor";
   docId: Id<"docs">;
-  clientId: string;
-  areStepsInFlight: boolean;
+  doc: string;
+  version: number;
+  optionClientId: Option<string>;
 };
 
-// TODO: Maybe parameterize entire `Model` by this distinction?
-type InitializableEditor =
-  | {
-      _tag: "InitializingEditor";
-      doc: string;
-      version: number;
-    }
-  | {
-      _tag: "InitializedEditor";
-      editor: TiptapEditor;
-      callbackManager: CallbackManager<Msg>;
-    };
+type InitializedEditorModel = {
+  _tag: "InitializedEditor";
+  docId: Id<"docs">;
+  clientId: string;
+  editor: TiptapEditor;
+  callbackManager: CallbackManager<Msg>;
+  areStepsInFlight: boolean;
+};
 
 export const init = ({
   docId,
@@ -60,17 +58,25 @@ export const init = ({
   docId: Id<"docs">;
   doc: string;
   version: number;
-}): Model => {
-  // TODO: This makes this function impure
-  const clientId = crypto.randomUUID();
-
-  return {
+}): [Model, Cmd<Msg>] => [
+  {
+    _tag: "InitializingEditor",
     docId,
-    clientId,
-    initializableEditor: { _tag: "InitializingEditor", doc, version },
-    areStepsInFlight: false,
-  };
-};
+    doc,
+    version,
+    optionClientId: option.none,
+  },
+  pipe(
+    () => crypto.randomUUID(),
+    io.map(
+      (clientId): Msg => ({
+        _tag: "GotInitializingEditorMsg",
+        msg: { _tag: "GeneratedClientId", clientId },
+      })
+    ),
+    cmdExtra.fromIO
+  ),
+];
 
 // UPDATE
 
@@ -84,10 +90,11 @@ type InitializingEditorMsg =
       _tag: "EditorWasInitialized";
       editor: TiptapEditor;
       callbackManager: CallbackManager<Msg>;
-    };
+    }
+  | { _tag: "GeneratedClientId"; clientId: string };
 
 type InitializedEditorMsg =
-  | { _tag: "EditorTransactionApplied"; editorState: EditorState }
+  | { _tag: "EditorTransactionApplied" }
   | { _tag: "StepsSent" }
   | {
       _tag: "ReceivedSteps";
@@ -101,129 +108,168 @@ export const update =
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with(
         [
-          { _tag: "GotInitializedEditorMsg" },
-          { initializableEditor: { _tag: "InitializedEditor" } },
+          {
+            _tag: "GotInitializingEditorMsg",
+            msg: P.select("initializingEditorMsg"),
+          },
+          P.select("initializingEditorModel", { _tag: "InitializingEditor" }),
         ],
-        ([{ msg: initializedEditorMsg }, initializedEditorModel]) =>
-          match<InitializedEditorMsg, [Model, Cmd<Msg>]>(initializedEditorMsg)
+        ({ initializingEditorMsg, initializingEditorModel }) =>
+          match<InitializingEditorMsg, [Model, Cmd<Msg>]>(initializingEditorMsg)
             .with(
-              { _tag: "EditorTransactionApplied", editorState: P.select() },
-              (editorState) =>
-                match<boolean, [Model, Cmd<Msg>]>(model.areStepsInFlight)
-                  .with(true, () => [model, cmd.none])
-                  .with(false, () => {
-                    const sendableSteps = collab.sendableSteps(editorState);
-
-                    return match<
-                      ReturnType<typeof collab.sendableSteps>,
-                      [Model, Cmd<Msg>]
-                    >(sendableSteps)
-                      .with(null, () => [model, cmd.none])
-                      .with(P.not(null), ({ version, steps }) => [
-                        Lens.fromProp<Model>()("areStepsInFlight").set(true)(
-                          model
-                        ),
-                        runMutation(
-                          convex.mutation("sendSteps"),
-                          (): Option<Msg> =>
-                            option.some({
-                              _tag: "GotInitializedEditorMsg",
-                              msg: { _tag: "StepsSent" },
-                            }),
-                          model.docId,
-                          model.clientId,
-                          version,
-                          readonlyArray
-                            .toArray(steps)
-                            .map((step: Step) => JSON.stringify(step.toJSON()))
-                        ),
-                      ])
-                      .exhaustive();
-                  })
-                  .exhaustive()
+              { _tag: "GeneratedClientId", clientId: P.select() },
+              (clientId) => [
+                Lens.fromProp<InitializingEditorModel>()("optionClientId").set(
+                  option.some(clientId)
+                )(initializingEditorModel),
+                cmd.none,
+              ]
             )
-            .with({ _tag: "StepsSent" }, () =>
-              match<ReturnType<typeof collab.sendableSteps>, [Model, Cmd<Msg>]>(
-                collab.sendableSteps(
-                  initializedEditorModel.initializableEditor.editor.state
-                )
+            .with({ _tag: "ComponentDidMount" }, () =>
+              match<Option<string>, [Model, Cmd<Msg>]>(
+                initializingEditorModel.optionClientId
               )
-                .with(null, () => [
-                  Lens.fromProp<Model>()("areStepsInFlight").set(false)(model),
-                  cmd.none,
-                ])
-                .with(P.not(null), ({ version, steps }) => [
-                  Lens.fromProp<Model>()("areStepsInFlight").set(true)(model),
-                  // TODO: Same `"stepsSent"` call, extract and share?
-                  runMutation(
-                    convex.mutation("sendSteps"),
-                    (): Option<Msg> =>
-                      option.some({
-                        _tag: "GotInitializedEditorMsg",
-                        msg: { _tag: "StepsSent" },
-                      }),
-                    model.docId,
-                    model.clientId,
-                    version,
-                    readonlyArray
-                      .toArray(steps)
-                      .map((step: Step) => JSON.stringify(step.toJSON()))
-                  ),
-                ])
+                .with(
+                  { _tag: "Some", value: P.select("clientId") },
+                  ({ clientId }) =>
+                    pipe<
+                      [InitializingEditorModel, Cmd<InitializingEditorMsg>],
+                      [Model, Cmd<Msg>]
+                    >(
+                      [
+                        initializingEditorModel,
+                        initializeEditorCmd({
+                          clientId,
+                          doc: initializingEditorModel.doc,
+                          version: initializingEditorModel.version,
+                        }),
+                      ],
+                      tuple.mapSnd(
+                        cmd.map(
+                          (
+                            initializingEditorMsg_: InitializingEditorMsg
+                          ): Msg => ({
+                            _tag: "GotInitializingEditorMsg",
+                            msg: initializingEditorMsg_,
+                          })
+                        )
+                      )
+                    )
+                )
+                .with({ _tag: "None" }, () => [model, cmd.none])
                 .exhaustive()
             )
-            .with({ _tag: "ReceivedSteps" }, ({ steps }) => [
-              model,
-              receiveTransactionCmd(
-                initializedEditorModel.initializableEditor.editor,
-                steps
-              ),
-            ])
-            .with({ _tag: "ComponentWillUnmount" }, () => [
-              model,
-              destroyEditorCmd(
-                initializedEditorModel.initializableEditor.editor
-              ),
-            ])
+            .with(
+              { _tag: "EditorWasInitialized" },
+              ({ editor, callbackManager }): [Model, Cmd<Msg>] =>
+                match<Option<string>, [Model, Cmd<Msg>]>(
+                  initializingEditorModel.optionClientId
+                )
+                  .with({ _tag: "Some", value: P.select() }, (clientId) => [
+                    {
+                      _tag: "InitializedEditor",
+                      docId: initializingEditorModel.docId,
+                      clientId,
+                      editor,
+                      callbackManager,
+                      areStepsInFlight: false,
+                    },
+                    cmd.none,
+                  ])
+                  .with({ _tag: "None" }, () => [model, cmd.none])
+                  .exhaustive()
+            )
             .exhaustive()
       )
       .with(
         [
-          { _tag: "GotInitializingEditorMsg" },
-          { initializableEditor: { _tag: "InitializingEditor" } },
+          {
+            _tag: "GotInitializedEditorMsg",
+            msg: P.select("initializedEditorMsg"),
+          },
+          P.select("initializedEditorModel", { _tag: "InitializedEditor" }),
         ],
-        ([{ msg: initializingEditorMsg }, initializingEditorModel]) =>
-          match<InitializingEditorMsg, [Model, Cmd<Msg>]>(initializingEditorMsg)
-            .with({ _tag: "ComponentDidMount" }, () => [
-              model,
-              initializeEditorCmd({
-                clientId: initializingEditorModel.clientId,
-                doc: initializingEditorModel.initializableEditor.doc,
-                version: initializingEditorModel.initializableEditor.version,
-              }),
-            ])
-            .with(
-              { _tag: "EditorWasInitialized" },
-              ({ editor, callbackManager }) => [
-                {
-                  ...initializingEditorModel,
-                  initializableEditor: {
-                    _tag: "InitializedEditor",
-                    editor,
-                    callbackManager,
-                  },
-                },
-                cmd.none,
-              ]
+        ({ initializedEditorMsg, initializedEditorModel }) =>
+          tuple.mapSnd<Cmd<InitializedEditorMsg>, Cmd<Msg>>(
+            cmd.map(
+              (initializedEditorMsg_): Msg => ({
+                _tag: "GotInitializedEditorMsg",
+                msg: initializedEditorMsg_,
+              })
             )
-            .exhaustive()
+          )(
+            match<
+              InitializedEditorMsg,
+              [InitializedEditorModel, Cmd<InitializedEditorMsg>]
+            >(initializedEditorMsg)
+              .with({ _tag: "EditorTransactionApplied" }, () =>
+                match<
+                  boolean,
+                  [InitializedEditorModel, Cmd<InitializedEditorMsg>]
+                >(initializedEditorModel.areStepsInFlight)
+                  .with(true, () => [initializedEditorModel, cmd.none])
+                  .with(false, () =>
+                    match<
+                      ReturnType<typeof collab.sendableSteps>,
+                      [InitializedEditorModel, Cmd<InitializedEditorMsg>]
+                    >(collab.sendableSteps(initializedEditorModel.editor.state))
+                      .with(null, () => [initializedEditorModel, cmd.none])
+                      .with(P.not(null), ({ version, steps }) => [
+                        Lens.fromProp<InitializedEditorModel>()(
+                          "areStepsInFlight"
+                        ).set(true)(initializedEditorModel),
+                        sendStepsCmd(
+                          convex,
+                          initializedEditorModel,
+                          version,
+                          steps
+                        ),
+                      ])
+                      .exhaustive()
+                  )
+                  .exhaustive()
+              )
+              .with({ _tag: "StepsSent" }, () =>
+                match<
+                  ReturnType<typeof collab.sendableSteps>,
+                  [InitializedEditorModel, Cmd<InitializedEditorMsg>]
+                >(collab.sendableSteps(initializedEditorModel.editor.state))
+                  .with(null, () => [
+                    Lens.fromProp<InitializedEditorModel>()(
+                      "areStepsInFlight"
+                    ).set(false)(initializedEditorModel),
+                    cmd.none,
+                  ])
+                  .with(P.not(null), ({ version, steps }) => [
+                    Lens.fromProp<InitializedEditorModel>()(
+                      "areStepsInFlight"
+                    ).set(true)(initializedEditorModel),
+                    sendStepsCmd(
+                      convex,
+                      initializedEditorModel,
+                      version,
+                      steps
+                    ),
+                  ])
+                  .exhaustive()
+              )
+              .with({ _tag: "ReceivedSteps" }, ({ steps }) => [
+                initializedEditorModel,
+                receiveTransactionCmd(initializedEditorModel.editor, steps),
+              ])
+              .with({ _tag: "ComponentWillUnmount" }, () => [
+                initializedEditorModel,
+                destroyEditorCmd(initializedEditorModel.editor),
+              ])
+              .exhaustive()
+          )
       )
       .otherwise(() => [model, cmd.none]); // TODO: Error
 
 const receiveTransactionCmd: (
   editor: TiptapEditor,
   steps: NonEmptyArray<{ step: string; clientId: string }>
-) => Cmd<Msg> = (editor, steps_) => {
+) => Cmd<never> = (editor, steps_) => {
   const { steps, clientIds } = nonEmptyArray.reduce<
     { step: string; clientId: string },
     { steps: Step[]; clientIds: string[] }
@@ -257,7 +303,7 @@ const initializeEditorCmd = ({
   clientId: string;
   doc: string;
   version: number;
-}): Cmd<Msg> =>
+}): Cmd<InitializingEditorMsg> =>
   pipe(
     () => document.getElementById(editorId(clientId)),
     cmdExtra.fromIO,
@@ -271,38 +317,34 @@ const initializeEditorCmd = ({
             const callbackInterop: CallbackInterop<Msg> =
               callbackManager.manageCallbacks<Msg>()();
 
-            return cmd.of<Msg>({
-              _tag: "GotInitializingEditorMsg",
-              msg: {
-                _tag: "EditorWasInitialized",
-                editor: new TiptapEditor({
-                  element: htmlElement,
-                  content: JSON.parse(doc) as string,
-                  extensions: [
-                    ...extensions,
-                    Placeholder.configure({
-                      placeholder: "Write something…",
-                      emptyNodeClass:
-                        "first:before:h-0 first:before:text-gray-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none",
-                    }),
-                    Extension.create({
-                      addProseMirrorPlugins: () => [
-                        collab.collab({ version, clientID: clientId }),
-                      ],
-                    }),
-                  ],
-                  onTransaction: (props) => {
-                    callbackInterop.dispatch({
-                      _tag: "GotInitializedEditorMsg",
-                      msg: {
-                        _tag: "EditorTransactionApplied",
-                        editorState: props.editor.state,
-                      },
-                    })();
-                  },
-                }),
-                callbackManager: callbackInterop.callbackManager,
-              },
+            return cmd.of<InitializingEditorMsg>({
+              _tag: "EditorWasInitialized",
+              editor: new TiptapEditor({
+                element: htmlElement,
+                content: JSON.parse(doc) as string,
+                extensions: [
+                  ...extensions,
+                  Placeholder.configure({
+                    placeholder: "Write something…",
+                    emptyNodeClass:
+                      "first:before:h-0 first:before:text-gray-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none",
+                  }),
+                  Extension.create({
+                    addProseMirrorPlugins: () => [
+                      collab.collab({ version, clientID: clientId }),
+                    ],
+                  }),
+                ],
+                onTransaction: () => {
+                  callbackInterop.dispatch({
+                    _tag: "GotInitializedEditorMsg",
+                    msg: {
+                      _tag: "EditorTransactionApplied",
+                    },
+                  })();
+                },
+              }),
+              callbackManager: callbackInterop.callbackManager,
             });
           }
         )
@@ -310,32 +352,51 @@ const initializeEditorCmd = ({
     )
   );
 
+const sendStepsCmd = (
+  convex: ConvexReactClient<ConvexAPI>,
+  initializedEditorModel: InitializedEditorModel,
+  version: number,
+  steps: ReadonlyArray<Step>
+): Cmd<InitializedEditorMsg> =>
+  runMutation(
+    convex.mutation("sendSteps"),
+    () => option.some<InitializedEditorMsg>({ _tag: "StepsSent" }),
+    initializedEditorModel.docId,
+    initializedEditorModel.clientId,
+    version,
+    readonlyArray
+      .toArray(steps)
+      .map((step: Step) => JSON.stringify(step.toJSON()))
+  );
+
 // VIEW
 
-export const view: (model: Model) => Html<Msg> = (model) => (dispatch) => {
-  const version = match(model.initializableEditor)
+export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
+  match(model)
     .with(
-      { _tag: "InitializingEditor", version: P.select() },
-      (version) => version
+      { _tag: "InitializingEditor" },
+      ({ optionClientId, docId, version }) =>
+        match(optionClientId)
+          .with({ _tag: "Some", value: P.select() }, (clientId) => (
+            <Editor
+              dispatch={dispatch}
+              docId={docId}
+              clientId={clientId}
+              version={version}
+            ></Editor>
+          ))
+          .with({ _tag: "None" }, () => <></>)
+          .exhaustive()
     )
-    .with({ _tag: "InitializedEditor", editor: P.select() }, (editor) =>
-      collab.getVersion(editor.state)
-    )
+    .with({ _tag: "InitializedEditor" }, ({ docId, clientId, editor }) => (
+      <Editor
+        dispatch={dispatch}
+        docId={docId}
+        clientId={clientId}
+        version={collab.getVersion(editor.state)}
+      ></Editor>
+    ))
     .exhaustive();
-
-  const docId = model.docId;
-
-  const clientId = model.clientId;
-
-  return (
-    <Editor
-      dispatch={dispatch}
-      docId={docId}
-      clientId={clientId}
-      version={version}
-    ></Editor>
-  );
-};
 
 const Editor = ({
   dispatch,
@@ -399,15 +460,8 @@ const editorId = (clientId: string): string => `editor-${clientId}`;
 
 export const subscriptions: (model: Model) => Sub<Msg> = (model) =>
   match<Model, Sub<Msg>>(model)
-    .with(
-      { initializableEditor: { _tag: "InitializedEditor" } },
-      (initializedEditorModel) =>
-        callbackManager.subscriptions(
-          initializedEditorModel.initializableEditor.callbackManager
-        )
+    .with({ _tag: "InitializedEditor" }, (initializedEditorModel) =>
+      callbackManager.subscriptions(initializedEditorModel.callbackManager)
     )
-    .with(
-      { initializableEditor: { _tag: "InitializingEditor" } },
-      () => sub.none
-    )
+    .with({ _tag: "InitializingEditor" }, () => sub.none)
     .exhaustive();

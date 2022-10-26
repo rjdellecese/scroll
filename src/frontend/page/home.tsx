@@ -62,13 +62,19 @@ export const update =
           },
           { _tag: "LoadingDoc" },
         ],
-        ({ doc, version }) => [
-          {
-            _tag: "LoadedDoc",
-            editorModel: editor.init({ docId: fixedDocId, doc, version }),
-          },
-          cmd.none,
-        ]
+        ({ doc, version }) =>
+          pipe(
+            editor.init({ docId: fixedDocId, doc, version }),
+            tuple.bimap(
+              cmd.map(
+                (editorMsg): Msg => ({ _tag: "GotEditorMsg", msg: editorMsg })
+              ),
+              (editorModel): Model => ({
+                _tag: "LoadedDoc",
+                editorModel,
+              })
+            )
+          )
       )
       .with(
         [
