@@ -1,8 +1,8 @@
 [build]
   publish = "dist/"
-  command = "npx parcel build src/frontend/index.html && npx convex deploy"
+  command = "npx convex codegen && npx parcel build src/frontend/index.html && npx convex deploy"
 [functions]
-  directory = "src/netlify"
+  directory = "src/netlify/"
 [dev]
   command = "parcel src/frontend/index.html"
 [[redirects]]
