@@ -14,6 +14,7 @@ module.exports = {
     "fp-ts",
     "simple-import-sort",
     "no-type-assertion",
+    "unicorn",
   ],
   root: true,
   rules: {
@@ -41,12 +42,15 @@ module.exports = {
     { files: ["tailwind.config.js"], env: { node: true } },
     // https://stackoverflow.com/a/64488474
     {
-      files: ["src/*/**.ts", "src/*/**.tsx"],
+      files: ["src/**/*.ts", "src/**/*.tsx"],
       excludedFiles: ["src/convex/**/*.ts", "src/convex/**/*.tsx"],
       globals: { process: true },
       parserOptions: {
         tsconfigRootDir: __dirname,
         project: ["./tsconfig.json"],
+      },
+      rules: {
+        "unicorn/filename-case": ["error", { case: "kebabCase" }],
       },
     },
     {
@@ -54,6 +58,12 @@ module.exports = {
       parserOptions: {
         tsconfigRootDir: __dirname,
         project: ["./src/convex/tsconfig.json"],
+      },
+      rules: {
+        "unicorn/filename-case": [
+          "error",
+          { cases: { kebabCase: true, camelCase: true } },
+        ],
       },
     },
   ],

@@ -1,7 +1,7 @@
 import { Node } from "prosemirror-model";
 import { Step } from "prosemirror-transform";
 
-import { schema } from "../tiptapSchemaExtensions";
+import { schema } from "../tiptap-schema-extensions";
 import type { Id } from "./_generated/dataModel";
 import { mutation } from "./_generated/server";
 import getVersion from "./getVersion";

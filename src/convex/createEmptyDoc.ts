@@ -1,6 +1,6 @@
 import { EditorState } from "prosemirror-state";
 
-import { schema } from "../tiptapSchemaExtensions";
+import { schema } from "../tiptap-schema-extensions";
 import type { Id } from "./_generated/dataModel";
 import { mutation } from "./_generated/server";
 

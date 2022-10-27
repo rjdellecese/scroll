@@ -22,12 +22,11 @@ import { useQuery } from "~src/convex/_generated/react";
 import type {
   CallbackInterop,
   CallbackManager,
-} from "~src/elm-ts/callbackManager";
-import * as callbackManager from "~src/elm-ts/callbackManager";
-import * as cmdExtra from "~src/elm-ts/cmdExtra";
-import { extensions } from "~src/tiptapSchemaExtensions";
-
-import { runMutation } from "./convexElmTs";
+} from "~src/elm-ts/callback-manager";
+import * as callbackManager from "~src/elm-ts/callback-manager";
+import * as cmdExtra from "~src/elm-ts/cmd-extra";
+import { runMutation } from "~src/elm-ts/convex-elm-ts";
+import { extensions } from "~src/tiptap-schema-extensions";
 
 // MODEL
 
