@@ -14,8 +14,8 @@ import { match, P } from "ts-pattern";
 import { Id } from "~src/convex/_generated/dataModel";
 import type { ConvexAPI } from "~src/convex/_generated/react";
 import { useQuery } from "~src/convex/_generated/react";
-import { runMutation } from "~src/elmTs/convexElmTs";
-import * as editor from "~src/elmTs/editor";
+import { runMutation } from "~src/elm-ts/convexElmTs";
+import * as editor from "~src/elm-ts/editor";
 
 // MODEl
 

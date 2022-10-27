@@ -1,10 +1,10 @@
 [build]
   publish = "dist/"
-  command = "npx convex codegen && npx parcel build src/elmTs/index.html && npx convex deploy"
+  command = "npx convex codegen && npx parcel build src/elm-ts/index.html && npx convex deploy"
 [functions]
   directory = "src/netlify/"
 [dev]
-  command = "parcel src/elmTs/index.html"
+  command = "parcel src/elm-ts/index.html"
 [[redirects]]
   from = "/*"
   to = "/index.html"

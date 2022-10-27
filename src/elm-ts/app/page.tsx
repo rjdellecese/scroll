@@ -10,10 +10,10 @@ import * as React from "react";
 import { match, P } from "ts-pattern";
 
 import type { ConvexAPI } from "~src/convex/_generated/react";
-import type { Flags } from "~src/elmTs/flags";
-import * as home from "~src/elmTs/app/page/home";
-import type { Route } from "~src/elmTs/route";
-import * as route from "~src/elmTs/route";
+import type { Flags } from "~src/elm-ts/flags";
+import * as home from "~src/elm-ts/app/page/home";
+import type { Route } from "~src/elm-ts/route";
+import * as route from "~src/elm-ts/route";
 
 // MODEL
 

@@ -22,9 +22,9 @@ import { useQuery } from "~src/convex/_generated/react";
 import type {
   CallbackInterop,
   CallbackManager,
-} from "~src/elmTs/callbackManager";
-import * as callbackManager from "~src/elmTs/callbackManager";
-import * as cmdExtra from "~src/elmTs/cmdExtra";
+} from "~src/elm-ts/callbackManager";
+import * as callbackManager from "~src/elm-ts/callbackManager";
+import * as cmdExtra from "~src/elm-ts/cmdExtra";
 import { extensions } from "~src/tiptapSchemaExtensions";
 
 import { runMutation } from "./convexElmTs";

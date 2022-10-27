@@ -12,8 +12,8 @@ import { match, P } from "ts-pattern";
 
 import clientConfig from "~src/convex/_generated/clientConfig";
 import type { ConvexAPI } from "~src/convex/_generated/react";
-import * as page from "~src/elmTs/app/page";
-import type { Flags } from "~src/elmTs/flags";
+import * as page from "~src/elm-ts/app/page";
+import type { Flags } from "~src/elm-ts/flags";
 
 // MODEL
 

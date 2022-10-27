@@ -7,9 +7,9 @@ import { pipe } from "fp-ts/lib/function";
 import { render } from "react-dom";
 import { match } from "ts-pattern";
 
-import * as app from "~/src/elmTs/app";
-import * as flags from "~/src/elmTs/flags";
-import * as stage from "~src/elmTs/stage";
+import * as app from "~/src/elm-ts/app";
+import * as flags from "~/src/elm-ts/flags";
+import * as stage from "~src/elm-ts/stage";
 
 pipe(
   process.env.NODE_ENV,
