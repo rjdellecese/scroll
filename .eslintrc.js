@@ -60,10 +60,7 @@ module.exports = {
         project: ["./src/convex/tsconfig.json"],
       },
       rules: {
-        "unicorn/filename-case": [
-          "error",
-          { cases: { kebabCase: true, camelCase: true } },
-        ],
+        "unicorn/filename-case": ["error", { case: "camelCase" }],
       },
     },
   ],
