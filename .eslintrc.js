@@ -42,7 +42,7 @@ module.exports = {
     // https://stackoverflow.com/a/64488474
     {
       files: ["src/*/**.ts", "src/*/**.tsx"],
-      excludedFiles: ["src/backend/**/*.ts", "src/backend/**/*.tsx"],
+      excludedFiles: ["src/convex/**/*.ts", "src/convex/**/*.tsx"],
       globals: { process: true },
       parserOptions: {
         tsconfigRootDir: __dirname,
@@ -50,10 +50,10 @@ module.exports = {
       },
     },
     {
-      files: ["src/backend/**/*.ts", "src/backend/**/*.tsx"],
+      files: ["src/convex/**/*.ts", "src/convex/**/*.tsx"],
       parserOptions: {
         tsconfigRootDir: __dirname,
-        project: ["./src/backend/tsconfig.json"],
+        project: ["./src/convex/tsconfig.json"],
       },
     },
   ],
