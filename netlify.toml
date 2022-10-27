@@ -1,6 +1,10 @@
 [build]
   publish = "dist/"
   command = "npx convex deploy && npm run build"
+[functions]
+  directory = "src/netlify"
+[dev]
+  command = "parcel src/frontend/index.html"
 [[redirects]]
   from = "/*"
   to = "/index.html"
