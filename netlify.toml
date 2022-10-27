@@ -1,6 +1,6 @@
 [build]
   publish = "dist/"
-  command = "npx convex deploy && npx parcel build src/frontend/index.html"
+  command = "npx parcel build src/frontend/index.html && npx convex deploy"
 [functions]
   directory = "src/netlify"
 [dev]
