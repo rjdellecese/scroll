@@ -3,7 +3,6 @@
   "private": "true",
   "scripts": {
     "start": "concurrently --restart-tries=-1 --prefix-colors=\"black.bold.bgCyan,black.bold.bgYellow\" --prefix=\" {name} \" --names=\"NETLIFY,CONVEX\" \"BROWSER=none netlify dev\" \"convex dev\"",
-    "build": "parcel build src/frontend/index.html",
     "pretest": "concurrently --group --prefix-colors=\"black.bold.bgMagenta,black.bold.bgBlue\" --prefix=\" {name} \" --names=\"PRETTIER,ESLINT\" \"prettier --check .\" \"eslint --max-warnings=0 .\"",
     "test": "jest"
   },
