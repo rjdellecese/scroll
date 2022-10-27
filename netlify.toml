@@ -1,6 +1,6 @@
 [build]
   publish = "dist/"
-  command = "npx convex deploy && npm run build"
+  command = "npx concurrently --group --prefix-colors=\"black.bold.bgYellow,black.bold.bgGreen\" --prefix=\" {name} \"--names=\"CONVEX,PARCEL\" \"npx convex deploy\" \"npx parcel build src/frontend/index.html\""
 [functions]
   directory = "src/netlify"
 [dev]
