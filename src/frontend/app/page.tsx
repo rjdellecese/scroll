@@ -9,7 +9,7 @@ import { flow, pipe } from "fp-ts/function";
 import * as React from "react";
 import { match, P } from "ts-pattern";
 
-import type { ConvexAPI } from "~src/backend/_generated/react";
+import type { ConvexAPI } from "~src/convex/_generated/react";
 import type { Flags } from "~src/frontend/flags";
 import * as home from "~src/frontend/app/page/home";
 import type { Route } from "~src/frontend/route";

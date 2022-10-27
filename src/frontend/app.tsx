@@ -10,8 +10,8 @@ import { apply, pipe } from "fp-ts/lib/function";
 import React from "react";
 import { match, P } from "ts-pattern";
 
-import clientConfig from "~src/backend/_generated/clientConfig";
-import type { ConvexAPI } from "~src/backend/_generated/react";
+import clientConfig from "~src/convex/_generated/clientConfig";
+import type { ConvexAPI } from "~src/convex/_generated/react";
 import * as page from "~src/frontend/app/page";
 import type { Flags } from "~src/frontend/flags";
 

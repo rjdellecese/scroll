@@ -1,6 +1,6 @@
 {
   "include": ["src/**/*", "node_modules/@types/node/index.d.ts"],
-  "exclude": ["src/backend/**/*"],
+  "exclude": ["src/convex/**/*"],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {

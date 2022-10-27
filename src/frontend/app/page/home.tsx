@@ -11,9 +11,9 @@ import type { Dispatch } from "react";
 import React from "react";
 import { match, P } from "ts-pattern";
 
-import { Id } from "~src/backend/_generated/dataModel";
-import type { ConvexAPI } from "~src/backend/_generated/react";
-import { useQuery } from "~src/backend/_generated/react";
+import { Id } from "~src/convex/_generated/dataModel";
+import type { ConvexAPI } from "~src/convex/_generated/react";
+import { useQuery } from "~src/convex/_generated/react";
 import { runMutation } from "~src/frontend/convexElmTs";
 import * as editor from "~src/frontend/editor";
 

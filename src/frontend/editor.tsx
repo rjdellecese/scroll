@@ -16,9 +16,9 @@ import type { Dispatch, ReactElement } from "react";
 import React from "react";
 import { match, P } from "ts-pattern";
 
-import type { Id } from "~src/backend/_generated/dataModel";
-import type { ConvexAPI } from "~src/backend/_generated/react";
-import { useQuery } from "~src/backend/_generated/react";
+import type { Id } from "~src/convex/_generated/dataModel";
+import type { ConvexAPI } from "~src/convex/_generated/react";
+import { useQuery } from "~src/convex/_generated/react";
 import type {
   CallbackInterop,
   CallbackManager,

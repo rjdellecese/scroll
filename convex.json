@@ -2,6 +2,6 @@
   "project": "forever-note-f0bf1",
   "team": "rjdellecese",
   "prodUrl": "https://quixotic-duck-546.convex.cloud",
-  "functions": "src/backend/",
+  "functions": "src/convex/",
   "authInfo": []
 }
