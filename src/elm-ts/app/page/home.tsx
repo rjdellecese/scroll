@@ -48,7 +48,7 @@ export const update =
           })
         ),
       ])
-      .with([{ _tag: "DocCreated", docId: P.select() }, P.any], (docId) => {
+      .with([{ _tag: "DocCreated", docId: P.select() }, P.any], () => {
         // TODO
         return [model, cmd.none];
       })

@@ -25,20 +25,19 @@ export default mutation(
         return;
       }
 
-      const parsedSteps = steps.map((step) =>
-        Step.fromJSON(schema, JSON.parse(step))
-      );
       const parsedDoc = Node.fromJSON(schema, JSON.parse(doc.doc));
-      const updatedParsedDoc = parsedSteps.reduce(
+      const updatedParsedDoc = steps.reduce(
         (currentDoc, step, currentIndex) => {
+          const parsedStep = Step.fromJSON(schema, JSON.parse(step));
+
           db.insert("steps", {
             docId: docId,
-            step: steps[currentIndex],
+            step,
             clientId: clientId,
             position: persistedVersion + currentIndex + 1,
           });
 
-          const nextDoc = step.apply(currentDoc).doc;
+          const nextDoc = parsedStep.apply(currentDoc).doc;
           if (nextDoc) {
             return nextDoc;
           } else {
