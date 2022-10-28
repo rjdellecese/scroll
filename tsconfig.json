@@ -1,6 +1,6 @@
 {
-  "include": ["src/**/*", "node_modules/@types/node/index.d.ts"],
-  "exclude": ["src/convex/**/*"],
+  "include": ["src/**/*"],
+  "exclude": ["src/convex/**/*", "src/netlify/**/*"],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
@@ -9,5 +9,5 @@
     "isolatedModules": true,
     "jsx": "react"
   },
-  "extends": "@tsconfig/recommended/tsconfig.json"
+  "extends": "@tsconfig/strictest/tsconfig.json"
 }

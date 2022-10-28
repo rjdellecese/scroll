@@ -10,9 +10,10 @@ import { match } from "ts-pattern";
 import * as app from "~/src/elm-ts/app";
 import * as flags from "~/src/elm-ts/flags";
 import * as stage from "~src/elm-ts/stage";
+import * as sentryConfig from "~src/sentry-config";
 
 pipe(
-  process.env.NODE_ENV,
+  process.env["NODE_ENV"],
   stage.fromNodeEnv,
   (optionStage) =>
     match(optionStage)
@@ -25,12 +26,9 @@ pipe(
       )
       .with({ _tag: "Some", value: "Production" }, () => {
         Sentry.init({
-          dsn: "https://49a723076cc84925bfb2265827ca1270@o4504010981179392.ingest.sentry.io/4504010983604224",
+          dsn: sentryConfig.dsn,
+          tunnel: "/.netlify/functions/tunnel-to-sentry",
           integrations: [new BrowserTracing()],
-
-          // Set tracesSampleRate to 1.0 to capture 100%
-          // of transactions for performance monitoring.
-          // We recommend adjusting this value in production
           tracesSampleRate: 1.0,
         });
 

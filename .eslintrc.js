@@ -43,7 +43,7 @@ module.exports = {
     // https://stackoverflow.com/a/64488474
     {
       files: ["src/**/*.ts", "src/**/*.tsx"],
-      excludedFiles: ["src/convex/**/*.ts", "src/convex/**/*.tsx"],
+      excludedFiles: ["src/convex/**/*.ts", "src/netlify/**/*.ts"],
       globals: { process: true },
       parserOptions: {
         tsconfigRootDir: __dirname,
@@ -54,13 +54,23 @@ module.exports = {
       },
     },
     {
-      files: ["src/convex/**/*.ts", "src/convex/**/*.tsx"],
+      files: ["src/convex/**/*.ts"],
       parserOptions: {
         tsconfigRootDir: __dirname,
         project: ["./src/convex/tsconfig.json"],
       },
       rules: {
         "unicorn/filename-case": ["error", { case: "camelCase" }],
+      },
+    },
+    {
+      files: ["src/netlify/**/*.ts"],
+      parserOptions: {
+        tsconfigRootDir: __dirname,
+        project: ["./src/netlify/tsconfig.json"],
+      },
+      rules: {
+        "unicorn/filename-case": ["error", { case: "kebabCase" }],
       },
     },
   ],
