@@ -1,4 +1,8 @@
 {
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "isolatedModules": true
+  },
   "include": ["./**/*"],
   "extends": "@tsconfig/node16-strictest/tsconfig.json"
 }
