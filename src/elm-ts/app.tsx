@@ -14,19 +14,25 @@ import clientConfig from "~src/convex/_generated/clientConfig";
 import type { ConvexAPI } from "~src/convex/_generated/react";
 import * as page from "~src/elm-ts/app/page";
 import type { Flags } from "~src/elm-ts/flags";
+import type { Stage } from "~src/elm-ts/stage";
 
 // MODEL
 
-type Model = { convex: ConvexReactClient<ConvexAPI>; page: page.Model };
+type Model = {
+  stage: Stage;
+  convex: ConvexReactClient<ConvexAPI>;
+  page: page.Model;
+};
 
 export const init: (
   flags: Flags
 ) => (location: Location) => [Model, Cmd<Msg>] = (flags) => (location) =>
   pipe(
-    page.init(flags)(location),
+    page.init(location),
     tuple.bimap(
       cmd.map((pageMsg) => ({ _tag: "GotPageMsg", msg: pageMsg })),
       (pageModel) => ({
+        stage: flags.stage,
         convex: new ConvexReactClient(clientConfig),
         page: pageModel,
       })
@@ -51,7 +57,7 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
       ],
       ({ pageMsg, pageModel }) =>
         pipe(
-          page.update(model.convex)(pageMsg, pageModel),
+          page.update(model.stage, model.convex)(pageMsg, pageModel),
           tuple.bimap(
             cmd.map((pageMsg_) => ({ _tag: "GotPageMsg", msg: pageMsg_ })),
             (pageModel_) => ({ ...model, page: pageModel_ })

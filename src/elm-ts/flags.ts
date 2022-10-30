@@ -1,5 +1,3 @@
-import type { IO } from "fp-ts/lib/IO";
+import type { Stage } from "~src/elm-ts/stage";
 
-export type Flags = [];
-
-export const init: IO<Flags> = () => [];
+export type Flags = { stage: Stage };

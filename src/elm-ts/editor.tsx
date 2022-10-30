@@ -26,7 +26,10 @@ import type {
 import * as callbackManager from "~src/elm-ts/callback-manager";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
+import * as logMessage from "~src/elm-ts/log-message";
 import { extensions } from "~src/tiptap-schema-extensions";
+
+import type { Stage } from "./stage";
 
 // MODEL
 
@@ -102,7 +105,7 @@ type InitializedEditorMsg =
   | { _tag: "ComponentWillUnmount" };
 
 export const update =
-  (convex: ConvexReactClient<ConvexAPI>) =>
+  (stage: Stage, convex: ConvexReactClient<ConvexAPI>) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with(
@@ -138,6 +141,7 @@ export const update =
                       [
                         initializingEditorModel,
                         initializeEditorCmd({
+                          stage,
                           clientId,
                           doc: initializingEditorModel.doc,
                           version: initializingEditorModel.version,
@@ -263,7 +267,12 @@ export const update =
               .exhaustive()
           )
       )
-      .otherwise(() => [model, cmd.none]); // TODO: Error
+      .otherwise(() => [
+        model,
+        logMessage.report(stage)(
+          logMessage.error(`Mismatched model "${model}" with msg "${msg}"`)
+        ),
+      ]);
 
 const receiveTransactionCmd: (
   editor: TiptapEditor,
@@ -295,10 +304,12 @@ const destroyEditorCmd = (editor: TiptapEditor): Cmd<never> =>
   pipe(() => editor.destroy(), cmdExtra.fromIOVoid);
 
 const initializeEditorCmd = ({
+  stage,
   clientId,
   doc,
   version,
 }: {
+  stage: Stage;
   clientId: string;
   doc: string;
   version: number;
@@ -310,8 +321,10 @@ const initializeEditorCmd = ({
       flow(
         option.fromNullable,
         option.match(
-          // TODO: Report error
-          () => cmd.none,
+          () =>
+            logMessage.report(stage)(
+              logMessage.error("Failed to find editor element by HTML ID")
+            ),
           (htmlElement) => {
             const callbackInterop: CallbackInterop<Msg> =
               callbackManager.manageCallbacks<Msg>()();

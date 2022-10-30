@@ -11,9 +11,9 @@ import { match, P } from "ts-pattern";
 
 import type { ConvexAPI } from "~src/convex/_generated/react";
 import * as home from "~src/elm-ts/app/page/home";
-import type { Flags } from "~src/elm-ts/flags";
 import type { Route } from "~src/elm-ts/route";
 import * as route from "~src/elm-ts/route";
+import type { Stage } from "~src/elm-ts/stage";
 
 // MODEL
 
@@ -41,9 +41,7 @@ const routeToModelCmd = (route: Route): [Model, Cmd<Msg>] =>
     .with({ _tag: "NotFound" }, () => [{ _tag: "NotFound" }, cmd.none])
     .exhaustive();
 
-export const init: (
-  flags: Flags
-) => (location: Location) => [Model, Cmd<Msg>] = (flags) => (location) =>
+export const init: (location: Location) => [Model, Cmd<Msg>] = (location) =>
   pipe(location.pathname, route.fromLocationPathname, routeToModelCmd);
 
 // MESSAGES
@@ -55,7 +53,7 @@ export type Msg =
 // UPDATE
 
 export const update =
-  (convex: ConvexReactClient<ConvexAPI>) =>
+  (stage: Stage, convex: ConvexReactClient<ConvexAPI>) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with(
@@ -68,7 +66,7 @@ export const update =
         ],
         ({ homeMsg, homeModel }) =>
           pipe(
-            home.update(convex)(homeMsg, homeModel),
+            home.update(stage, convex)(homeMsg, homeModel),
             tuple.bimap(
               cmd.map((homeMsg_) => ({ _tag: "GotHomeMsg", msg: homeMsg_ })),
               (homeModel_) => ({ _tag: "Home", model: homeModel_ })

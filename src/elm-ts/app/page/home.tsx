@@ -16,6 +16,8 @@ import type { ConvexAPI } from "~src/convex/_generated/react";
 import { useQuery } from "~src/convex/_generated/react";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import * as editor from "~src/elm-ts/editor";
+import type { Stage } from "~src/elm-ts/stage";
+import * as logMessage from "~src/elm-ts/log-message";
 
 // MODEl
 
@@ -36,7 +38,7 @@ export type Msg =
   | { _tag: "GotEditorMsg"; msg: editor.Msg };
 
 export const update =
-  (convex: ConvexReactClient<ConvexAPI>) =>
+  (stage: Stage, convex: ConvexReactClient<ConvexAPI>) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with([{ _tag: "CreateDocButtonClicked" }, P.any], () => [
@@ -82,7 +84,7 @@ export const update =
         ],
         ({ editorMsg, editorModel }) =>
           pipe(
-            editor.update(convex)(editorMsg, editorModel),
+            editor.update(stage, convex)(editorMsg, editorModel),
             tuple.bimap(
               cmd.map((editorMsg_) => ({
                 _tag: "GotEditorMsg",
@@ -95,8 +97,12 @@ export const update =
             )
           )
       )
-      // TODO
-      .otherwise(() => [model, cmd.none]);
+      .otherwise(() => [
+        model,
+        logMessage.report(stage)(
+          logMessage.error(`Failed to match model "${model}" with msg ${msg}`)
+        ),
+      ]);
 
 // VIEW
 
