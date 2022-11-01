@@ -451,7 +451,7 @@ const Editor = ({
   const stepsSince = useQuery("getStepsSince", docId, version);
 
   React.useEffect(() => {
-    console.log(`stepsSince for ${docId}`, stepsSince);
+    console.log(`stepsSince for ${docId}, version ${version}`, stepsSince);
 
     pipe(
       stepsSince,

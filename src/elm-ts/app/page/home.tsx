@@ -4,30 +4,37 @@ import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import { array, map, option, tuple } from "fp-ts";
+import { array, map, number, option, tuple } from "fp-ts";
 import { apply, constVoid, identity, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
+import type { Ord } from "fp-ts/lib/Ord";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
 import { match, P } from "ts-pattern";
 
 import type { API } from "~src/convex/_generated/api";
-import type { Document } from "~src/convex/_generated/dataModel";
-import type { Id } from "~src/convex/_generated/dataModel";
+import type { Document, Id } from "~src/convex/_generated/dataModel";
 import { useQuery } from "~src/convex/_generated/react";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import * as editor from "~src/elm-ts/editor";
 import * as logMessage from "~src/elm-ts/log-message";
 import type { Stage } from "~src/elm-ts/stage";
 import * as id from "~src/id";
-import type { TimestampedId } from "~src/timestamped-id";
-import * as timestampedId from "~src/timestamped-id";
 
 // MODEl
 
 export type Model =
   | { _tag: "LoadingDocs" }
-  | { _tag: "LoadedDocs"; editors: Map<TimestampedId<"docs">, editor.Model> };
+  | { _tag: "LoadedDocs"; editors: Map<Id<"docs">, editor.Model> };
+
+// TODO
+const editorModelsArrayOrd: Ord<
+  [Id<"docs">, { _creationTime: number; editorModel: editor.Model }]
+> = {
+  equals: (x, y) => x[0].equals(y[0]),
+  compare: (first, second) =>
+    number.Ord.compare(first[1]._creationTime, second[1]._creationTime),
+};
 
 export const init: Model = {
   _tag: "LoadingDocs",
@@ -37,14 +44,14 @@ export const init: Model = {
 
 export type Msg =
   | { _tag: "CreateDocButtonClicked" }
-  | { _tag: "DocCreated"; docTimestampedId: TimestampedId<"docs"> }
+  | { _tag: "DocCreated"; docId: Id<"docs"> }
   | {
       _tag: "GotDocs";
-      docs: Map<TimestampedId<"docs">, { doc: string; version: number }>;
+      docs: Map<Id<"docs">, { doc: string; version: number }>;
     }
   | {
       _tag: "GotEditorMsg";
-      docTimestampedId: TimestampedId<"docs">;
+      docId: Id<"docs">;
       msg: editor.Msg;
     };
 
@@ -54,10 +61,10 @@ export const update =
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with([{ _tag: "CreateDocButtonClicked" }, P.any], () => [
         model,
-        runMutation(convex.mutation("createEmptyDoc"), (doc) =>
+        runMutation(convex.mutation("createEmptyDoc"), (docId) =>
           option.some({
             _tag: "DocCreated",
-            docTimestampedId: timestampedId.fromDocument(doc),
+            docId: docId,
           })
         ),
       ])
@@ -76,11 +83,9 @@ export const update =
         (docs) =>
           pipe(
             docs,
-            map.reduceWithIndex<TimestampedId<"docs">>(
-              timestampedId.getOrd<"docs">()
-            )<
+            map.reduceWithIndex<Id<"docs">>(id.getOrd<"docs">())<
               {
-                editors: Map<TimestampedId<"docs">, editor.Model>;
+                editors: Map<Id<"docs">, editor.Model>;
                 cmds: Cmd<Msg>[];
               },
               { doc: Document<"docs">["doc"]; version: number }
@@ -89,23 +94,22 @@ export const update =
                 editors: new Map(),
                 cmds: [],
               },
-              (docTimestampedId, { editors, cmds }, { doc, version }) =>
+              (docId, { editors, cmds }, { doc, version }) =>
                 pipe(
-                  editor.init({ docId: docTimestampedId._id, doc, version }),
+                  editor.init({ docId: docId, doc, version }),
                   tuple.mapSnd(
                     cmd.map(
                       (editorMsg): Msg => ({
                         _tag: "GotEditorMsg",
-                        docTimestampedId,
+                        docId,
                         msg: editorMsg,
                       })
                     )
                   ),
                   ([editor, cmd_]) => ({
-                    editors: map.upsertAt(timestampedId.getEq<"docs">())(
-                      docTimestampedId,
-                      editor
-                    )(editors),
+                    editors: map.upsertAt(id.getEq<"docs">())(docId, editor)(
+                      editors
+                    ),
                     cmds: array.append(cmd_)(cmds),
                   })
                 )
@@ -120,15 +124,17 @@ export const update =
         [
           {
             _tag: "GotEditorMsg",
-            docTimestampedId: P.select("docTimestampedId"),
+            docId: P.select("docId"),
             msg: P.select("editorMsg"),
           },
           { _tag: "LoadedDocs", editors: P.select("editors") },
         ],
-        ({ docTimestampedId, editorMsg, editors }) =>
-          pipe(
+        ({ docId, editorMsg, editors }) => {
+          console.log("docId", docId);
+          console.log("editorMsg", editorMsg);
+          return pipe(
             editors,
-            map.lookup(timestampedId.getEq<"docs">())(docTimestampedId),
+            map.lookup(id.getEq<"docs">())(docId),
             option.map((editorModel) =>
               pipe(
                 editor.update(stage, convex)(editorMsg, editorModel),
@@ -136,14 +142,14 @@ export const update =
                   cmd.map(
                     (editorMsg_): Msg => ({
                       _tag: "GotEditorMsg",
-                      docTimestampedId,
+                      docId,
                       msg: editorMsg_,
                     })
                   ),
                   (editorModel_): Model => ({
                     _tag: "LoadedDocs",
-                    editors: map.upsertAt(timestampedId.getEq<"docs">())(
-                      docTimestampedId,
+                    editors: map.upsertAt(id.getEq<"docs">())(
+                      docId,
                       editorModel_
                     )(editors),
                   })
@@ -151,7 +157,8 @@ export const update =
               )
             ),
             option.match(() => [model, cmd.none], identity)
-          )
+          );
+        }
       )
       .otherwise(() => [
         model,
@@ -210,33 +217,35 @@ const LoadedDocs = ({
   editors,
 }: {
   dispatch: Dispatch<Msg>;
-  editors: Map<TimestampedId<"docs">, editor.Model>;
+  editors: Map<Id<"docs">, editor.Model>;
 }): ReactElement => (
   <>
     {pipe(
       editors,
-      map.reduceWithIndex<TimestampedId<"docs">>(
-        timestampedId.getOrd<"docs">()
-      )<ReactElement[], editor.Model>(
-        [],
-        (docTimestampedId, reactElements, editorModel) =>
-          array.append(
-            <React.Fragment key={docTimestampedId._id.toString()}>
-              {pipe(
-                editorModel,
-                editor.view,
-                html.map(
-                  (editorMsg): Msg => ({
-                    _tag: "GotEditorMsg",
-                    docTimestampedId,
-                    msg: editorMsg,
-                  })
-                ),
-                apply(dispatch)
-              )}
-            </React.Fragment>
-          )(reactElements)
-      )
+      map.reduceWithIndex<Id<"docs">>(id.getOrd<"docs">())<
+        ReactElement[],
+        editor.Model
+      >([], (docId, reactElements, editorModel) => {
+        console.log("viewDocId", docId);
+        console.log("editorDocId", editorModel.docId);
+
+        return array.append(
+          <React.Fragment key={docId.toString()}>
+            {pipe(
+              editorModel,
+              editor.view,
+              html.map(
+                (editorMsg): Msg => ({
+                  _tag: "GotEditorMsg",
+                  docId,
+                  msg: editorMsg,
+                })
+              ),
+              apply(dispatch)
+            )}
+          </React.Fragment>
+        )(reactElements);
+      })
     )}
   </>
 );
@@ -248,10 +257,13 @@ export const subscriptions = (model: Model) => {
     .with({ _tag: "LoadingDocs" }, () => sub.none)
     .with({ _tag: "LoadedDocs" }, ({ editors }) =>
       pipe(
+        // TODO
+        // [...editors.entries()],
         editors,
-        map.reduceWithIndex<TimestampedId<"docs">>(
-          timestampedId.getOrd<"docs">()
-        )<Sub<Msg>[], editor.Model>([], (docTimestampedId, subs, editorModel) =>
+        map.reduceWithIndex<Id<"docs">>(id.getOrd<"docs">())<
+          Sub<Msg>[],
+          editor.Model
+        >([], (docId, subs, editorModel) =>
           array.append(
             pipe(
               editorModel,
@@ -259,7 +271,7 @@ export const subscriptions = (model: Model) => {
               sub.map(
                 (editorMsg): Msg => ({
                   _tag: "GotEditorMsg",
-                  docTimestampedId,
+                  docId,
                   msg: editorMsg,
                 })
               )
