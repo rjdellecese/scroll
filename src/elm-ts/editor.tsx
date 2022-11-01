@@ -6,19 +6,18 @@ import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
-import { constVoid, flow, hole, pipe } from "fp-ts/function";
+import { constVoid, flow, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
-import type { Dispatch, ReactElement, ReactNode } from "react";
+import type { Dispatch, ReactElement } from "react";
 import React from "react";
-import ReactDOM from "react-dom";
 import { match, P } from "ts-pattern";
 
+import type { API } from "~src/convex/_generated/api";
 import type { Id } from "~src/convex/_generated/dataModel";
-import type { ConvexAPI } from "~src/convex/_generated/react";
 import { useQuery } from "~src/convex/_generated/react";
 import type {
   CallbackInterop,
@@ -108,7 +107,7 @@ type InitializedEditorMsg =
   | { _tag: "ComponentWillUnmount" };
 
 export const update =
-  (stage: Stage, convex: ConvexReactClient<ConvexAPI>) =>
+  (stage: Stage, convex: ConvexReactClient<API>) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with(
@@ -393,7 +392,7 @@ const initializeEditorCmd = ({
   );
 
 const sendStepsCmd = (
-  convex: ConvexReactClient<ConvexAPI>,
+  convex: ConvexReactClient<API>,
   initializedEditorModel: InitializedEditorModel,
   version: number,
   steps: ReadonlyArray<Step>

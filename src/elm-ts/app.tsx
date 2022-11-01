@@ -10,8 +10,8 @@ import { apply, pipe } from "fp-ts/lib/function";
 import React from "react";
 import { match, P } from "ts-pattern";
 
+import type { API } from "~src/convex/_generated/api";
 import clientConfig from "~src/convex/_generated/clientConfig";
-import type { ConvexAPI } from "~src/convex/_generated/react";
 import * as page from "~src/elm-ts/app/page";
 import type { Flags } from "~src/elm-ts/flags";
 import type { Stage } from "~src/elm-ts/stage";
@@ -20,7 +20,7 @@ import type { Stage } from "~src/elm-ts/stage";
 
 type Model = {
   stage: Stage;
-  convex: ConvexReactClient<ConvexAPI>;
+  convex: ConvexReactClient<API>;
   page: page.Model;
 };
 

@@ -11,9 +11,9 @@ import type { Dispatch, ReactElement } from "react";
 import React from "react";
 import { match, P } from "ts-pattern";
 
+import type { API } from "~src/convex/_generated/api";
 import type { Document } from "~src/convex/_generated/dataModel";
 import type { Id } from "~src/convex/_generated/dataModel";
-import type { ConvexAPI } from "~src/convex/_generated/react";
 import { useQuery } from "~src/convex/_generated/react";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import * as editor from "~src/elm-ts/editor";
@@ -49,7 +49,7 @@ export type Msg =
     };
 
 export const update =
-  (stage: Stage, convex: ConvexReactClient<ConvexAPI>) =>
+  (stage: Stage, convex: ConvexReactClient<API>) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with([{ _tag: "CreateDocButtonClicked" }, P.any], () => [
@@ -187,7 +187,7 @@ const LoadingDocs = ({
         docs,
         option.match(
           () => constVoid,
-          (docs: ReturnType<NamedQuery<ConvexAPI, "getDocs">>): IO<void> =>
+          (docs: ReturnType<NamedQuery<API, "getDocs">>): IO<void> =>
             () =>
               dispatch({
                 _tag: "GotDocs",
@@ -249,10 +249,9 @@ export const subscriptions = (model: Model) => {
     .with({ _tag: "LoadedDocs" }, ({ editors }) =>
       pipe(
         editors,
-        map.reduceWithIndex<Id<"docs">>(id.getOrd<"docs">())<
-          Sub<Msg>[],
-          editor.Model
-        >([], (docId, subs, editorModel) =>
+        map.reduceWithIndex<TimestampedId<"docs">>(
+          timestampedId.getOrd<"docs">()
+        )<Sub<Msg>[], editor.Model>([], (docTimestampedId, subs, editorModel) =>
           array.append(
             pipe(
               editorModel,
@@ -260,7 +259,7 @@ export const subscriptions = (model: Model) => {
               sub.map(
                 (editorMsg): Msg => ({
                   _tag: "GotEditorMsg",
-                  docTimestampedId: docId,
+                  docTimestampedId,
                   msg: editorMsg,
                 })
               )

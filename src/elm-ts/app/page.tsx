@@ -9,7 +9,7 @@ import { flow, pipe } from "fp-ts/function";
 import * as React from "react";
 import { match, P } from "ts-pattern";
 
-import type { ConvexAPI } from "~src/convex/_generated/react";
+import type { API } from "~src/convex/_generated/api";
 import * as home from "~src/elm-ts/app/page/home";
 import type { Route } from "~src/elm-ts/route";
 import * as route from "~src/elm-ts/route";
@@ -53,7 +53,7 @@ export type Msg =
 // UPDATE
 
 export const update =
-  (stage: Stage, convex: ConvexReactClient<ConvexAPI>) =>
+  (stage: Stage, convex: ConvexReactClient<API>) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with(
