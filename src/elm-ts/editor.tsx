@@ -6,14 +6,15 @@ import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
-import { constVoid, flow, pipe } from "fp-ts/function";
+import { constVoid, flow, hole, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
-import type { Dispatch, ReactElement } from "react";
+import type { Dispatch, ReactElement, ReactNode } from "react";
 import React from "react";
+import ReactDOM from "react-dom";
 import { match, P } from "ts-pattern";
 
 import type { Id } from "~src/convex/_generated/dataModel";
@@ -41,6 +42,7 @@ type InitializingEditorModel = {
   doc: string;
   version: number;
   optionClientId: Option<string>;
+  didComponentMount: boolean;
 };
 
 type InitializedEditorModel = {
@@ -67,6 +69,7 @@ export const init = ({
     doc,
     version,
     optionClientId: option.none,
+    didComponentMount: false,
   },
   pipe(
     () => crypto.randomUUID(),
@@ -120,47 +123,23 @@ export const update =
           match<InitializingEditorMsg, [Model, Cmd<Msg>]>(initializingEditorMsg)
             .with(
               { _tag: "GeneratedClientId", clientId: P.select() },
-              (clientId) => [
-                Lens.fromProp<InitializingEditorModel>()("optionClientId").set(
-                  option.some(clientId)
-                )(initializingEditorModel),
-                cmd.none,
-              ]
+              (clientId) =>
+                pipe(
+                  initializingEditorModel,
+                  Lens.fromProp<InitializingEditorModel>()(
+                    "optionClientId"
+                  ).set(option.some(clientId)),
+                  initializeEditorIfPossible(stage)
+                )
             )
             .with({ _tag: "ComponentDidMount" }, () =>
-              match<Option<string>, [Model, Cmd<Msg>]>(
-                initializingEditorModel.optionClientId
+              pipe(
+                initializingEditorModel,
+                Lens.fromProp<InitializingEditorModel>()(
+                  "didComponentMount"
+                ).set(true),
+                initializeEditorIfPossible(stage)
               )
-                .with(
-                  { _tag: "Some", value: P.select("clientId") },
-                  ({ clientId }) =>
-                    pipe<
-                      [InitializingEditorModel, Cmd<InitializingEditorMsg>],
-                      [Model, Cmd<Msg>]
-                    >(
-                      [
-                        initializingEditorModel,
-                        initializeEditorCmd({
-                          stage,
-                          clientId,
-                          doc: initializingEditorModel.doc,
-                          version: initializingEditorModel.version,
-                        }),
-                      ],
-                      tuple.mapSnd(
-                        cmd.map(
-                          (
-                            initializingEditorMsg_: InitializingEditorMsg
-                          ): Msg => ({
-                            _tag: "GotInitializingEditorMsg",
-                            msg: initializingEditorMsg_,
-                          })
-                        )
-                      )
-                    )
-                )
-                .with({ _tag: "None" }, () => [model, cmd.none])
-                .exhaustive()
             )
             .with(
               { _tag: "EditorWasInitialized" },
@@ -270,7 +249,7 @@ export const update =
       .otherwise(() => [
         model,
         logMessage.report(stage)(
-          logMessage.error(`Mismatched model "${model}" with msg "${msg}"`)
+          logMessage.error("Mismatched model with msg", { model, msg })
         ),
       ]);
 
@@ -303,6 +282,54 @@ const receiveTransactionCmd: (
 const destroyEditorCmd = (editor: TiptapEditor): Cmd<never> =>
   pipe(() => editor.destroy(), cmdExtra.fromIOVoid);
 
+const initializeEditorIfPossible =
+  (stage: Stage) =>
+  (
+    initializingEditorModel: InitializingEditorModel
+  ): [InitializingEditorModel, Cmd<Msg>] =>
+    pipe(
+      initializingEditorModel,
+      initializeEditor(stage),
+      option.match(
+        () => [initializingEditorModel, cmd.none],
+        tuple.mapSnd(
+          cmd.map(
+            (initializingEditorMsg_: InitializingEditorMsg): Msg => ({
+              _tag: "GotInitializingEditorMsg",
+              msg: initializingEditorMsg_,
+            })
+          )
+        )
+      )
+    );
+
+const initializeEditor =
+  (stage: Stage) =>
+  (
+    initializingEditorModel: InitializingEditorModel
+  ): Option<[InitializingEditorModel, Cmd<InitializingEditorMsg>]> =>
+    match<
+      InitializingEditorModel,
+      Option<[InitializingEditorModel, Cmd<InitializingEditorMsg>]>
+    >(initializingEditorModel)
+      .with(
+        {
+          optionClientId: { _tag: "Some", value: P.select("clientId") },
+          didComponentMount: true,
+        },
+        ({ clientId }) =>
+          option.some([
+            initializingEditorModel,
+            initializeEditorCmd({
+              stage,
+              clientId,
+              doc: initializingEditorModel.doc,
+              version: initializingEditorModel.version,
+            }),
+          ])
+      )
+      .otherwise(() => option.none);
+
 const initializeEditorCmd = ({
   stage,
   clientId,
@@ -325,40 +352,41 @@ const initializeEditorCmd = ({
             logMessage.report(stage)(
               logMessage.error("Failed to find editor element by HTML ID")
             ),
-          (htmlElement) => {
-            const callbackInterop: CallbackInterop<Msg> =
-              callbackManager.manageCallbacks<Msg>()();
+          (htmlElement) =>
+            pipe((): InitializingEditorMsg => {
+              const callbackInterop: CallbackInterop<Msg> =
+                callbackManager.manageCallbacks<Msg>()();
 
-            return cmd.of<InitializingEditorMsg>({
-              _tag: "EditorWasInitialized",
-              editor: new TiptapEditor({
-                element: htmlElement,
-                content: JSON.parse(doc) as string,
-                extensions: [
-                  ...extensions,
-                  Placeholder.configure({
-                    placeholder: "Write something…",
-                    emptyNodeClass:
-                      "first:before:h-0 first:before:text-gray-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none",
-                  }),
-                  Extension.create({
-                    addProseMirrorPlugins: () => [
-                      collab.collab({ version, clientID: clientId }),
-                    ],
-                  }),
-                ],
-                onTransaction: () => {
-                  callbackInterop.dispatch({
-                    _tag: "GotInitializedEditorMsg",
-                    msg: {
-                      _tag: "EditorTransactionApplied",
-                    },
-                  })();
-                },
-              }),
-              callbackManager: callbackInterop.callbackManager,
-            });
-          }
+              return {
+                _tag: "EditorWasInitialized",
+                editor: new TiptapEditor({
+                  element: htmlElement,
+                  content: JSON.parse(doc) as string,
+                  extensions: [
+                    ...extensions,
+                    Placeholder.configure({
+                      placeholder: "Write something…",
+                      emptyNodeClass:
+                        "first:before:h-0 first:before:text-gray-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none",
+                    }),
+                    Extension.create({
+                      addProseMirrorPlugins: () => [
+                        collab.collab({ version, clientID: clientId }),
+                      ],
+                    }),
+                  ],
+                  onTransaction: () => {
+                    callbackInterop.dispatch({
+                      _tag: "GotInitializedEditorMsg",
+                      msg: {
+                        _tag: "EditorTransactionApplied",
+                      },
+                    })();
+                  },
+                }),
+                callbackManager: callbackInterop.callbackManager,
+              };
+            }, cmdExtra.fromIO)
         )
       )
     )
@@ -423,33 +451,33 @@ const Editor = ({
 }): ReactElement => {
   const stepsSince = useQuery("getStepsSince", docId, version);
 
-  React.useEffect(
-    () =>
-      pipe(
-        stepsSince,
-        option.fromNullable,
-        option.match(
-          () => constVoid,
-          flow(
-            nonEmptyArray.fromArray,
-            option.map(
-              (steps): Msg => ({
-                _tag: "GotInitializedEditorMsg",
-                msg: {
-                  _tag: "ReceivedSteps",
-                  steps,
-                },
-              })
-            ),
-            option.match(
-              () => constVoid,
-              (msg) => () => dispatch(msg)
-            )
+  React.useEffect(() => {
+    console.log(`stepsSince for ${docId}`, stepsSince);
+
+    pipe(
+      stepsSince,
+      option.fromNullable,
+      option.match(
+        () => constVoid,
+        flow(
+          nonEmptyArray.fromArray,
+          option.map(
+            (steps): Msg => ({
+              _tag: "GotInitializedEditorMsg",
+              msg: {
+                _tag: "ReceivedSteps",
+                steps,
+              },
+            })
+          ),
+          option.match(
+            () => constVoid,
+            (msg) => () => dispatch(msg)
           )
         )
-      )(),
-    [stepsSince, dispatch]
-  );
+      )
+    )();
+  }, [stepsSince, dispatch]);
 
   React.useEffect(() => {
     dispatch({

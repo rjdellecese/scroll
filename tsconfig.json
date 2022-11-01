@@ -9,5 +9,5 @@
     "isolatedModules": true,
     "jsx": "react"
   },
-  "extends": "@tsconfig/strictest/tsconfig.json"
+  "extends": "@tsconfig/recommended/tsconfig.json"
 }
