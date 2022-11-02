@@ -13,6 +13,7 @@ export default query(
   > =>
     db
       .query("docs")
+      .order("desc")
       .take(10)
       .then((docs) =>
         docs.reduce(
