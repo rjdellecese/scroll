@@ -3,11 +3,11 @@ import type { DatabaseReader } from "./_generated/server";
 
 export default async (
   db: DatabaseReader,
-  docId: Id<"docs">
+  noteId: Id<"notes">
 ): Promise<number> => {
   const stepsQuery = db
     .query("steps")
-    .withIndex("by_doc_id_and_position", (q) => q.eq("docId", docId));
+    .withIndex("by_note_id_and_position", (q) => q.eq("noteId", noteId));
 
   const getVersion = async () => {
     let versionCounter = 0;

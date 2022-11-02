@@ -4,34 +4,34 @@ import { Step } from "prosemirror-transform";
 import { schema } from "../tiptap-schema-extensions";
 import type { Id } from "./_generated/dataModel";
 import { mutation } from "./_generated/server";
-import getVersion from "./getVersion";
+import getNoteVersion from "./getNoteVersion";
 
 export default mutation(
   async (
     { db },
-    docId: Id<"docs">,
+    noteId: Id<"notes">,
     clientId: string,
     clientPersistedVersion: number,
     steps: string[]
   ): Promise<void> => {
-    const doc = await db.get(docId);
+    const note = await db.get(noteId);
 
-    if (doc === null) {
-      throw "Couldn't find doc";
+    if (note === null) {
+      throw "Couldn't find note";
     } else {
-      const persistedVersion = await getVersion(db, doc._id);
+      const persistedVersion = await getNoteVersion(db, note._id);
 
       if (clientPersistedVersion !== persistedVersion) {
         return;
       }
 
-      const parsedDoc = Node.fromJSON(schema, JSON.parse(doc.doc));
+      const parsedDoc = Node.fromJSON(schema, JSON.parse(note.doc));
       const updatedParsedDoc = steps.reduce(
         (currentDoc, step, currentIndex) => {
           const parsedStep = Step.fromJSON(schema, JSON.parse(step));
 
           db.insert("steps", {
-            docId: docId,
+            noteId,
             step,
             clientId: clientId,
             position: persistedVersion + currentIndex + 1,
@@ -47,7 +47,7 @@ export default mutation(
         parsedDoc
       );
 
-      await db.replace(doc._id, {
+      await db.replace(note._id, {
         doc: JSON.stringify(updatedParsedDoc.toJSON()),
       });
     }

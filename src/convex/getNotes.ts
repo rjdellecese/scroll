@@ -1,37 +1,37 @@
 import type { Document, Id } from "./_generated/dataModel";
 import { query } from "./_generated/server";
-import getVersion from "./getVersion";
+import getNoteVersion from "./getNoteVersion";
 
 export default query(
   async ({
     db,
   }): Promise<
     Map<
-      Id<"docs">,
-      { doc: Document<"docs">["doc"]; creationTime: number; version: number }
+      Id<"notes">,
+      { doc: Document<"notes">["doc"]; creationTime: number; version: number }
     >
   > =>
     db
-      .query("docs")
+      .query("notes")
       .order("desc")
       .take(10)
-      .then((docs) =>
-        docs.reduce(
-          async (resultPromise, doc) =>
+      .then((notes) =>
+        notes.reduce(
+          async (resultPromise, note) =>
             resultPromise.then((result) =>
-              getVersion(db, doc._id).then((version) =>
-                result.set(doc._id, {
-                  doc: doc.doc,
-                  creationTime: doc._creationTime,
+              getNoteVersion(db, note._id).then((version) =>
+                result.set(note._id, {
+                  doc: note.doc,
+                  creationTime: note._creationTime,
                   version,
                 })
               )
             ),
           Promise.resolve(
             new Map<
-              Id<"docs">,
+              Id<"notes">,
               {
-                doc: Document<"docs">["doc"];
+                doc: Document<"notes">["doc"];
                 creationTime: number;
                 version: number;
               }

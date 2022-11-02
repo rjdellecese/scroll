@@ -38,7 +38,7 @@ export type Model = InitializingEditorModel | InitializedEditorModel;
 
 type InitializingEditorModel = {
   _tag: "InitializingEditor";
-  docId: Id<"docs">;
+  noteId: Id<"notes">;
   creationTime: number;
   doc: string;
   version: number;
@@ -48,7 +48,7 @@ type InitializingEditorModel = {
 
 type InitializedEditorModel = {
   _tag: "InitializedEditor";
-  docId: Id<"docs">;
+  noteId: Id<"notes">;
   creationTime: number;
   clientId: string;
   editor: TiptapEditor;
@@ -57,25 +57,25 @@ type InitializedEditorModel = {
 };
 
 export const Ord: ord.Ord<Model> = {
-  equals: (x, y) => x.docId.equals(y.docId),
+  equals: (x, y) => x.noteId.equals(y.noteId),
   compare: (first, second) =>
     number.Ord.compare(first.creationTime, second.creationTime),
 };
 
 export const init = ({
-  docId,
+  noteId,
   creationTime,
   doc,
   version,
 }: {
-  docId: Id<"docs">;
+  noteId: Id<"notes">;
   creationTime: number;
   doc: string;
   version: number;
 }): [Model, Cmd<Msg>] => [
   {
     _tag: "InitializingEditor",
-    docId,
+    noteId,
     creationTime,
     doc,
     version,
@@ -161,7 +161,7 @@ export const update =
                   .with({ _tag: "Some", value: P.select() }, (clientId) => [
                     {
                       _tag: "InitializedEditor",
-                      docId: initializingEditorModel.docId,
+                      noteId: initializingEditorModel.noteId,
                       creationTime: initializingEditorModel.creationTime,
                       clientId,
                       editor,
@@ -418,7 +418,7 @@ const sendStepsCmd = (
   runMutation(
     convex.mutation("sendSteps"),
     () => option.some<InitializedEditorMsg>({ _tag: "StepsSent" }),
-    initializedEditorModel.docId,
+    initializedEditorModel.noteId,
     initializedEditorModel.clientId,
     version,
     readonlyArray
@@ -432,12 +432,12 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
   match(model)
     .with(
       { _tag: "InitializingEditor" },
-      ({ optionClientId, docId, version }) =>
+      ({ optionClientId, noteId, version }) =>
         match(optionClientId)
           .with({ _tag: "Some", value: P.select() }, (clientId) => (
             <Editor
               dispatch={dispatch}
-              docId={docId}
+              noteId={noteId}
               clientId={clientId}
               version={version}
             ></Editor>
@@ -445,10 +445,10 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
           .with({ _tag: "None" }, () => <></>)
           .exhaustive()
     )
-    .with({ _tag: "InitializedEditor" }, ({ docId, clientId, editor }) => (
+    .with({ _tag: "InitializedEditor" }, ({ noteId, clientId, editor }) => (
       <Editor
         dispatch={dispatch}
-        docId={docId}
+        noteId={noteId}
         clientId={clientId}
         version={collab.getVersion(editor.state)}
       ></Editor>
@@ -457,16 +457,16 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
 
 const Editor = ({
   dispatch,
-  docId,
+  noteId,
   clientId,
   version,
 }: {
   dispatch: Dispatch<Msg>;
-  docId: Id<"docs">;
+  noteId: Id<"notes">;
   clientId: string;
   version: number;
 }): ReactElement => {
-  const stepsSince = useQuery("getStepsSince", docId, version);
+  const stepsSince = useQuery("getStepsSince", noteId, version);
 
   React.useEffect(() => {
     pipe(

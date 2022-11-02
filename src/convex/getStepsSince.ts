@@ -4,17 +4,20 @@ import { query } from "./_generated/server";
 export default query(
   async (
     { db },
-    docId: Id<"docs">,
+    noteId: Id<"notes">,
     version: number
   ): Promise<{ step: string; clientId: string }[]> =>
     db
       .query("steps")
       // TODO: Awaiting bug fix
-      // .withIndex("by_doc_id_and_position", (q) =>
-      //   q.eq("docId", docId).gt("position", version)
+      // .withIndex("by_note_id_and_position", (q) =>
+      //   q.eq("noteId", noteId).gt("position", version)
       // )
       .filter((q) =>
-        q.and(q.eq(q.field("docId"), docId), q.gt(q.field("position"), version))
+        q.and(
+          q.eq(q.field("noteId"), noteId),
+          q.gt(q.field("position"), version)
+        )
       )
       .collect()
       .then((steps) =>

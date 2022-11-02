@@ -15,104 +15,109 @@ import type { API } from "~src/convex/_generated/api";
 import type { Document, Id } from "~src/convex/_generated/dataModel";
 import { useQuery } from "~src/convex/_generated/react";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
-import * as editor from "~src/elm-ts/editor";
 import * as logMessage from "~src/elm-ts/log-message";
+import * as note from "~src/elm-ts/note";
 import type { Stage } from "~src/elm-ts/stage";
 import * as id from "~src/id";
 
 // MODEl
 
 export type Model =
-  | { _tag: "LoadingDocs" }
-  | { _tag: "LoadedDocs"; editors: Map<Id<"docs">, editor.Model> };
+  | { _tag: "LoadingNotes" }
+  | { _tag: "LoadedNotes"; idsToNoteModels: Map<Id<"notes">, note.Model> };
 
 export const init: Model = {
-  _tag: "LoadingDocs",
+  _tag: "LoadingNotes",
 };
 
 // UPDATE
 
 export type Msg =
-  | { _tag: "CreateDocButtonClicked" }
-  | { _tag: "DocCreated"; docId: Id<"docs"> }
+  | { _tag: "CreateNoteButtonClicked" }
+  | { _tag: "NoteCreated"; noteId: Id<"notes"> }
   | {
-      _tag: "GotDocs";
-      docs: Map<
-        Id<"docs">,
+      _tag: "GotNotes";
+      idsToNotes: Map<
+        Id<"notes">,
         { doc: string; creationTime: number; version: number }
       >;
     }
   | {
-      _tag: "GotEditorMsg";
-      docId: Id<"docs">;
-      msg: editor.Msg;
+      _tag: "GotNoteMsg";
+      noteId: Id<"notes">;
+      msg: note.Msg;
     };
 
 export const update =
   (stage: Stage, convex: ConvexReactClient<API>) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
-      .with([{ _tag: "CreateDocButtonClicked" }, P.any], () => [
+      .with([{ _tag: "CreateNoteButtonClicked" }, P.any], () => [
         model,
-        runMutation(convex.mutation("createEmptyDoc"), (docId) =>
+        runMutation(convex.mutation("createEmptyNote"), (noteId) =>
           option.some({
-            _tag: "DocCreated",
-            docId: docId,
+            _tag: "NoteCreated",
+            noteId: noteId,
           })
         ),
       ])
-      .with([{ _tag: "DocCreated", docId: P.select() }, P.any], () => {
+      .with([{ _tag: "NoteCreated", noteId: P.select() }, P.any], () => {
         // TODO
         return [model, cmd.none];
       })
       .with(
         [
           {
-            _tag: "GotDocs",
-            docs: P.select(),
+            _tag: "GotNotes",
+            idsToNotes: P.select(),
           },
-          { _tag: "LoadingDocs" },
+          { _tag: "LoadingNotes" },
         ],
-        (docs) =>
+        (idsToNotes) =>
           pipe(
-            docs,
-            map.reduceWithIndex<Id<"docs">>(id.getOrd<"docs">())<
+            idsToNotes,
+            map.reduceWithIndex<Id<"notes">>(id.getOrd<"notes">())<
               {
-                editors: Map<Id<"docs">, editor.Model>;
+                idsToNoteModels: Map<Id<"notes">, note.Model>;
                 cmds: Cmd<Msg>[];
               },
               {
-                doc: Document<"docs">["doc"];
+                doc: Document<"notes">["doc"];
                 creationTime: number;
                 version: number;
               }
             >(
               {
-                editors: new Map(),
+                idsToNoteModels: new Map(),
                 cmds: [],
               },
-              (docId, { editors, cmds }, { doc, creationTime, version }) =>
+              (
+                noteId,
+                { idsToNoteModels, cmds },
+                { doc, creationTime, version }
+              ) =>
                 pipe(
-                  editor.init({ docId, creationTime, doc, version }),
+                  note.init({ noteId, creationTime, doc, version }),
                   tuple.mapSnd(
                     cmd.map(
-                      (editorMsg): Msg => ({
-                        _tag: "GotEditorMsg",
-                        docId,
-                        msg: editorMsg,
+                      (noteMsg): Msg => ({
+                        _tag: "GotNoteMsg",
+                        noteId,
+                        msg: noteMsg,
                       })
                     )
                   ),
-                  ([editor, cmd_]) => ({
-                    editors: map.upsertAt(id.getEq<"docs">())(docId, editor)(
-                      editors
-                    ),
+                  ([noteModel, cmd_]) => ({
+                    idsToNoteModels: map.upsertAt(id.getEq<"notes">())(
+                      noteId,
+                      noteModel
+                    )(idsToNoteModels),
                     cmds: array.append(cmd_)(cmds),
                   })
                 )
             ),
-            ({ editors, cmds }) => [
-              { _tag: "LoadedDocs", editors },
+            ({ idsToNoteModels, cmds }) => [
+              { _tag: "LoadedNotes", idsToNoteModels },
               cmd.batch(cmds),
             ]
           )
@@ -120,33 +125,33 @@ export const update =
       .with(
         [
           {
-            _tag: "GotEditorMsg",
-            docId: P.select("docId"),
-            msg: P.select("editorMsg"),
+            _tag: "GotNoteMsg",
+            noteId: P.select("noteId"),
+            msg: P.select("noteMsg"),
           },
-          { _tag: "LoadedDocs", editors: P.select("editors") },
+          { _tag: "LoadedNotes", idsToNoteModels: P.select("idsToNoteModels") },
         ],
-        ({ docId, editorMsg, editors }) =>
+        ({ noteId, noteMsg, idsToNoteModels }) =>
           pipe(
-            editors,
-            map.lookup(id.getEq<"docs">())(docId),
-            option.map((editorModel) =>
+            idsToNoteModels,
+            map.lookup(id.getEq<"notes">())(noteId),
+            option.map((noteModel) =>
               pipe(
-                editor.update(stage, convex)(editorMsg, editorModel),
+                note.update(stage, convex)(noteMsg, noteModel),
                 tuple.bimap(
                   cmd.map(
                     (editorMsg_): Msg => ({
-                      _tag: "GotEditorMsg",
-                      docId,
+                      _tag: "GotNoteMsg",
+                      noteId,
                       msg: editorMsg_,
                     })
                   ),
-                  (editorModel_): Model => ({
-                    _tag: "LoadedDocs",
-                    editors: map.upsertAt(id.getEq<"docs">())(
-                      docId,
-                      editorModel_
-                    )(editors),
+                  (noteModel_): Model => ({
+                    _tag: "LoadedNotes",
+                    idsToNoteModels: map.upsertAt(id.getEq<"notes">())(
+                      noteId,
+                      noteModel_
+                    )(idsToNoteModels),
                   })
                 )
               )
@@ -165,63 +170,63 @@ export const update =
 
 export const view: (model: Model) => Html<Msg> = (model) =>
   match<Model, Html<Msg>>(model)
-    .with({ _tag: "LoadingDocs" }, () => (dispatch) => (
-      <LoadingDocs dispatch={dispatch} />
+    .with({ _tag: "LoadingNotes" }, () => (dispatch) => (
+      <LoadingNotes dispatch={dispatch} />
     ))
     .with(
-      { _tag: "LoadedDocs", editors: P.select() },
-      (editors) => (dispatch) =>
-        <LoadedDocs dispatch={dispatch} editors={editors} />
+      { _tag: "LoadedNotes", idsToNoteModels: P.select() },
+      (idsToNoteModels) => (dispatch) =>
+        <LoadedNotes dispatch={dispatch} idsToNoteModels={idsToNoteModels} />
     )
     .exhaustive();
 
-const LoadingDocs = ({
+const LoadingNotes = ({
   dispatch,
 }: {
   dispatch: Dispatch<Msg>;
 }): ReactElement => {
-  const docs = option.fromNullable(useQuery("getDocs"));
+  const notes = option.fromNullable(useQuery("getNotes"));
 
   React.useEffect(
     () =>
       pipe(
-        docs,
+        notes,
         option.match(
           () => constVoid,
-          (docs: ReturnType<NamedQuery<API, "getDocs">>): IO<void> =>
+          (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
             () =>
               dispatch({
-                _tag: "GotDocs",
-                docs,
+                _tag: "GotNotes",
+                idsToNotes,
               })
         )
       )(),
-    [docs, dispatch]
+    [notes, dispatch]
   );
 
   return <p>Loading notes…</p>;
 };
 
-const LoadedDocs = ({
+const LoadedNotes = ({
   dispatch,
-  editors,
+  idsToNoteModels: editors,
 }: {
   dispatch: Dispatch<Msg>;
-  editors: Map<Id<"docs">, editor.Model>;
+  idsToNoteModels: Map<Id<"notes">, note.Model>;
 }): ReactElement => (
   <>
     {pipe(
       editors,
-      map.values(editor.Ord),
+      map.values(note.Ord),
       array.map((editorModel) => (
-        <React.Fragment key={editorModel.docId.toString()}>
+        <React.Fragment key={editorModel.noteId.toString()}>
           {pipe(
             editorModel,
-            editor.view,
+            note.view,
             html.map(
               (editorMsg): Msg => ({
-                _tag: "GotEditorMsg",
-                docId: editorModel.docId,
+                _tag: "GotNoteMsg",
+                noteId: editorModel.noteId,
                 msg: editorMsg,
               })
             ),
@@ -230,7 +235,7 @@ const LoadedDocs = ({
         </React.Fragment>
       ))
     )}
-    <button onClick={() => dispatch({ _tag: "CreateDocButtonClicked" })}>
+    <button onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}>
       Create note
     </button>
   </>
@@ -240,22 +245,22 @@ const LoadedDocs = ({
 
 export const subscriptions = (model: Model) => {
   return match<Model, Sub<Msg>>(model)
-    .with({ _tag: "LoadingDocs" }, () => sub.none)
-    .with({ _tag: "LoadedDocs" }, ({ editors }) =>
+    .with({ _tag: "LoadingNotes" }, () => sub.none)
+    .with({ _tag: "LoadedNotes" }, ({ idsToNoteModels: editors }) =>
       pipe(
         editors,
-        map.reduceWithIndex<Id<"docs">>(id.getOrd<"docs">())<
+        map.reduceWithIndex<Id<"notes">>(id.getOrd<"notes">())<
           Sub<Msg>[],
-          editor.Model
-        >([], (docId, subs, editorModel) =>
+          note.Model
+        >([], (noteId, subs, editorModel) =>
           array.append(
             pipe(
               editorModel,
-              editor.subscriptions,
+              note.subscriptions,
               sub.map(
                 (editorMsg): Msg => ({
-                  _tag: "GotEditorMsg",
-                  docId,
+                  _tag: "GotNoteMsg",
+                  noteId,
                   msg: editorMsg,
                 })
               )
