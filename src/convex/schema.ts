@@ -2,7 +2,7 @@ import { defineSchema, defineTable, s } from "convex/schema";
 
 export default defineSchema({
   notes: defineTable({
-    doc: s.string(),
+    proseMirrorDoc: s.string(),
   }),
   steps: defineTable({
     noteId: s.id("notes"),

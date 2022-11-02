@@ -25,7 +25,7 @@ export default mutation(
         return;
       }
 
-      const parsedDoc = Node.fromJSON(schema, JSON.parse(note.doc));
+      const parsedDoc = Node.fromJSON(schema, JSON.parse(note.proseMirrorDoc));
       const updatedParsedDoc = steps.reduce(
         (currentDoc, step, currentIndex) => {
           const parsedStep = Step.fromJSON(schema, JSON.parse(step));
@@ -48,7 +48,7 @@ export default mutation(
       );
 
       await db.replace(note._id, {
-        doc: JSON.stringify(updatedParsedDoc.toJSON()),
+        proseMirrorDoc: JSON.stringify(updatedParsedDoc.toJSON()),
       });
     }
   }

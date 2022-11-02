@@ -1,7 +1,7 @@
 {
-  "project": "forever-note-f0bf1",
+  "project": "scroll",
   "team": "rjdellecese",
-  "prodUrl": "https://quixotic-duck-546.convex.cloud",
+  "prodUrl": "https://fleet-capybara-2.convex.cloud",
   "functions": "src/convex/",
   "authInfo": []
 }

@@ -39,7 +39,7 @@ export type Msg =
       _tag: "GotNotes";
       idsToNotes: Map<
         Id<"notes">,
-        { doc: string; creationTime: number; version: number }
+        { proseMirrorDoc: string; creationTime: number; version: number }
       >;
     }
   | {
@@ -82,7 +82,7 @@ export const update =
                 cmds: Cmd<Msg>[];
               },
               {
-                doc: Document<"notes">["doc"];
+                proseMirrorDoc: Document<"notes">["proseMirrorDoc"];
                 creationTime: number;
                 version: number;
               }
@@ -94,10 +94,10 @@ export const update =
               (
                 noteId,
                 { idsToNoteModels, cmds },
-                { doc, creationTime, version }
+                { proseMirrorDoc, creationTime, version }
               ) =>
                 pipe(
-                  note.init({ noteId, creationTime, doc, version }),
+                  note.init({ noteId, creationTime, proseMirrorDoc, version }),
                   tuple.mapSnd(
                     cmd.map(
                       (noteMsg): Msg => ({

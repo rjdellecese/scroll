@@ -40,7 +40,7 @@ type InitializingEditorModel = {
   _tag: "InitializingEditor";
   noteId: Id<"notes">;
   creationTime: number;
-  doc: string;
+  proseMirrorDoc: string;
   version: number;
   optionClientId: Option<string>;
   didComponentMount: boolean;
@@ -65,19 +65,19 @@ export const Ord: ord.Ord<Model> = {
 export const init = ({
   noteId,
   creationTime,
-  doc,
+  proseMirrorDoc,
   version,
 }: {
   noteId: Id<"notes">;
   creationTime: number;
-  doc: string;
+  proseMirrorDoc: string;
   version: number;
 }): [Model, Cmd<Msg>] => [
   {
     _tag: "InitializingEditor",
     noteId,
     creationTime,
-    doc,
+    proseMirrorDoc,
     version,
     optionClientId: option.none,
     didComponentMount: false,
@@ -335,7 +335,7 @@ const initializeEditor =
             initializeEditorCmd({
               stage,
               clientId,
-              doc: initializingEditorModel.doc,
+              proseMirrorDoc: initializingEditorModel.proseMirrorDoc,
               version: initializingEditorModel.version,
             }),
           ])
@@ -345,12 +345,12 @@ const initializeEditor =
 const initializeEditorCmd = ({
   stage,
   clientId,
-  doc,
+  proseMirrorDoc,
   version,
 }: {
   stage: Stage;
   clientId: string;
-  doc: string;
+  proseMirrorDoc: string;
   version: number;
 }): Cmd<InitializingEditorMsg> =>
   pipe(
@@ -378,7 +378,7 @@ const initializeEditorCmd = ({
                     },
                   },
                   element: htmlElement,
-                  content: JSON.parse(doc) as string,
+                  content: JSON.parse(proseMirrorDoc) as string,
                   extensions: [
                     ...extensions,
                     Placeholder.configure({

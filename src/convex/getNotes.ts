@@ -8,7 +8,11 @@ export default query(
   }): Promise<
     Map<
       Id<"notes">,
-      { doc: Document<"notes">["doc"]; creationTime: number; version: number }
+      {
+        proseMirrorDoc: Document<"notes">["proseMirrorDoc"];
+        creationTime: number;
+        version: number;
+      }
     >
   > =>
     db
@@ -21,7 +25,7 @@ export default query(
             resultPromise.then((result) =>
               getNoteVersion(db, note._id).then((version) =>
                 result.set(note._id, {
-                  doc: note.doc,
+                  proseMirrorDoc: note.proseMirrorDoc,
                   creationTime: note._creationTime,
                   version,
                 })
@@ -31,7 +35,7 @@ export default query(
             new Map<
               Id<"notes">,
               {
-                doc: Document<"notes">["doc"];
+                proseMirrorDoc: Document<"notes">["proseMirrorDoc"];
                 creationTime: number;
                 version: number;
               }

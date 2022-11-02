@@ -6,7 +6,7 @@ export default query(
   async (
     { db },
     noteId: Id<"notes">
-  ): Promise<{ doc: Document<"notes">["doc"]; version: number }> => {
+  ): Promise<{ doc: Document<"notes">["proseMirrorDoc"]; version: number }> => {
     const note = await db.get(noteId);
 
     if (note === null) {
@@ -16,6 +16,6 @@ export default query(
     const version = await getNoteVersion(db, note._id);
 
     // TODO: Return whole note and version
-    return { doc: note.doc, version: version };
+    return { doc: note.proseMirrorDoc, version: version };
   }
 );

@@ -9,15 +9,8 @@ export default query(
   ): Promise<{ step: string; clientId: string }[]> =>
     db
       .query("steps")
-      // TODO: Awaiting bug fix
-      // .withIndex("by_note_id_and_position", (q) =>
-      //   q.eq("noteId", noteId).gt("position", version)
-      // )
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("noteId"), noteId),
-          q.gt(q.field("position"), version)
-        )
+      .withIndex("by_note_id_and_position", (q) =>
+        q.eq("noteId", noteId).gt("position", version)
       )
       .collect()
       .then((steps) =>
