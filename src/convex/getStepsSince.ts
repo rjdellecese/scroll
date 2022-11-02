@@ -6,54 +6,35 @@ export default query(
     { db },
     docId: Id<"docs">,
     version: number
-  ): Promise<{ step: string; clientId: string }[]> => {
-    const steps: Document<"steps">[] = await db
+  ): Promise<{ step: string; clientId: string }[]> =>
+    db
       .query("steps")
-      // TODO
+      // TODO: Awaiting bug fix
       // .withIndex("by_doc_id_and_position", (q) =>
       //   q.eq("docId", docId).gt("position", version)
       // )
       .filter((q) =>
         q.and(q.eq(q.field("docId"), docId), q.gt(q.field("position"), version))
       )
-      .collect();
-
-    const steps_: Document<"steps">[] = await db
-      .query("steps")
-      .withIndex("by_doc_id_and_position", (q) =>
-        q.eq("docId", docId).gt("position", version)
+      .collect()
+      .then((steps) =>
+        steps.reduce<
+          Promise<
+            {
+              step: Document<"steps">["step"];
+              clientId: Document<"steps">["clientId"];
+            }[]
+          >
+        >(
+          async (resultPromise, step) =>
+            resultPromise.then((result) => [
+              ...result,
+              {
+                step: step.step,
+                clientId: step.clientId,
+              },
+            ]),
+          Promise.resolve([])
+        )
       )
-      // TODO
-      // .filter((q) =>
-      //   q.and(q.eq(q.field("docId"), docId), q.gt(q.field("position"), version))
-      // )
-      .collect();
-
-    console.log("docId", docId);
-    console.log(
-      "steps docIds",
-      steps.map((step) => step.docId)
-    );
-    console.log(
-      "steps_ docIds",
-      steps_.map((step) => step.docId)
-    );
-
-    return await steps.reduce<
-      Promise<
-        {
-          step: Document<"steps">["step"];
-          clientId: Document<"steps">["clientId"];
-        }[]
-      >
-    >(async (resultPromise, step) => {
-      return resultPromise.then((result) => [
-        ...result,
-        {
-          step: step.step,
-          clientId: step.clientId,
-        },
-      ]);
-    }, Promise.resolve([]));
-  }
 );
