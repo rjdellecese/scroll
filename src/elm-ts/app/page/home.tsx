@@ -4,10 +4,9 @@ import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import { array, map, number, option, tuple } from "fp-ts";
+import { array, map, option, tuple } from "fp-ts";
 import { apply, constVoid, identity, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
-import type { Ord } from "fp-ts/lib/Ord";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
 import { match, P } from "ts-pattern";
@@ -27,15 +26,6 @@ export type Model =
   | { _tag: "LoadingDocs" }
   | { _tag: "LoadedDocs"; editors: Map<Id<"docs">, editor.Model> };
 
-// TODO
-const editorModelsArrayOrd: Ord<
-  [Id<"docs">, { _creationTime: number; editorModel: editor.Model }]
-> = {
-  equals: (x, y) => x[0].equals(y[0]),
-  compare: (first, second) =>
-    number.Ord.compare(first[1]._creationTime, second[1]._creationTime),
-};
-
 export const init: Model = {
   _tag: "LoadingDocs",
 };
@@ -47,7 +37,10 @@ export type Msg =
   | { _tag: "DocCreated"; docId: Id<"docs"> }
   | {
       _tag: "GotDocs";
-      docs: Map<Id<"docs">, { doc: string; version: number }>;
+      docs: Map<
+        Id<"docs">,
+        { doc: string; creationTime: number; version: number }
+      >;
     }
   | {
       _tag: "GotEditorMsg";
@@ -88,15 +81,19 @@ export const update =
                 editors: Map<Id<"docs">, editor.Model>;
                 cmds: Cmd<Msg>[];
               },
-              { doc: Document<"docs">["doc"]; version: number }
+              {
+                doc: Document<"docs">["doc"];
+                creationTime: number;
+                version: number;
+              }
             >(
               {
                 editors: new Map(),
                 cmds: [],
               },
-              (docId, { editors, cmds }, { doc, version }) =>
+              (docId, { editors, cmds }, { doc, creationTime, version }) =>
                 pipe(
-                  editor.init({ docId: docId, doc, version }),
+                  editor.init({ docId, creationTime, doc, version }),
                   tuple.mapSnd(
                     cmd.map(
                       (editorMsg): Msg => ({
@@ -129,10 +126,8 @@ export const update =
           },
           { _tag: "LoadedDocs", editors: P.select("editors") },
         ],
-        ({ docId, editorMsg, editors }) => {
-          console.log("docId", docId);
-          console.log("editorMsg", editorMsg);
-          return pipe(
+        ({ docId, editorMsg, editors }) =>
+          pipe(
             editors,
             map.lookup(id.getEq<"docs">())(docId),
             option.map((editorModel) =>
@@ -157,8 +152,7 @@ export const update =
               )
             ),
             option.match(() => [model, cmd.none], identity)
-          );
-        }
+          )
       )
       .otherwise(() => [
         model,
@@ -205,11 +199,7 @@ const LoadingDocs = ({
     [docs, dispatch]
   );
 
-  return (
-    <button onClick={() => dispatch({ _tag: "CreateDocButtonClicked" })}>
-      Create doc
-    </button>
-  );
+  return <p>Loading notes…</p>;
 };
 
 const LoadedDocs = ({
@@ -222,31 +212,27 @@ const LoadedDocs = ({
   <>
     {pipe(
       editors,
-      map.reduceWithIndex<Id<"docs">>(id.getOrd<"docs">())<
-        ReactElement[],
-        editor.Model
-      >([], (docId, reactElements, editorModel) => {
-        console.log("viewDocId", docId);
-        console.log("editorDocId", editorModel.docId);
-
-        return array.append(
-          <React.Fragment key={docId.toString()}>
-            {pipe(
-              editorModel,
-              editor.view,
-              html.map(
-                (editorMsg): Msg => ({
-                  _tag: "GotEditorMsg",
-                  docId,
-                  msg: editorMsg,
-                })
-              ),
-              apply(dispatch)
-            )}
-          </React.Fragment>
-        )(reactElements);
-      })
+      map.values(editor.Ord),
+      array.map((editorModel) => (
+        <React.Fragment key={editorModel.docId.toString()}>
+          {pipe(
+            editorModel,
+            editor.view,
+            html.map(
+              (editorMsg): Msg => ({
+                _tag: "GotEditorMsg",
+                docId: editorModel.docId,
+                msg: editorMsg,
+              })
+            ),
+            apply(dispatch)
+          )}
+        </React.Fragment>
+      ))
     )}
+    <button onClick={() => dispatch({ _tag: "CreateDocButtonClicked" })}>
+      Create note
+    </button>
   </>
 );
 
@@ -257,8 +243,6 @@ export const subscriptions = (model: Model) => {
     .with({ _tag: "LoadingDocs" }, () => sub.none)
     .with({ _tag: "LoadedDocs" }, ({ editors }) =>
       pipe(
-        // TODO
-        // [...editors.entries()],
         editors,
         map.reduceWithIndex<Id<"docs">>(id.getOrd<"docs">())<
           Sub<Msg>[],

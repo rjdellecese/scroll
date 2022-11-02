@@ -5,10 +5,11 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import { io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
+import { io, nonEmptyArray, number, option, readonlyArray, tuple } from "fp-ts";
 import { constVoid, flow, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
+import type * as ord from "fp-ts/lib/Ord";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
@@ -38,6 +39,7 @@ export type Model = InitializingEditorModel | InitializedEditorModel;
 type InitializingEditorModel = {
   _tag: "InitializingEditor";
   docId: Id<"docs">;
+  creationTime: number;
   doc: string;
   version: number;
   optionClientId: Option<string>;
@@ -47,24 +49,34 @@ type InitializingEditorModel = {
 type InitializedEditorModel = {
   _tag: "InitializedEditor";
   docId: Id<"docs">;
+  creationTime: number;
   clientId: string;
   editor: TiptapEditor;
   callbackManager: CallbackManager<Msg>;
   areStepsInFlight: boolean;
 };
 
+export const Ord: ord.Ord<Model> = {
+  equals: (x, y) => x.docId.equals(y.docId),
+  compare: (first, second) =>
+    number.Ord.compare(first.creationTime, second.creationTime),
+};
+
 export const init = ({
   docId,
+  creationTime,
   doc,
   version,
 }: {
   docId: Id<"docs">;
+  creationTime: number;
   doc: string;
   version: number;
 }): [Model, Cmd<Msg>] => [
   {
     _tag: "InitializingEditor",
     docId,
+    creationTime,
     doc,
     version,
     optionClientId: option.none,
@@ -150,6 +162,7 @@ export const update =
                     {
                       _tag: "InitializedEditor",
                       docId: initializingEditorModel.docId,
+                      creationTime: initializingEditorModel.creationTime,
                       clientId,
                       editor,
                       callbackManager,
@@ -359,6 +372,11 @@ const initializeEditorCmd = ({
               return {
                 _tag: "EditorWasInitialized",
                 editor: new TiptapEditor({
+                  editorProps: {
+                    attributes: {
+                      class: "p-2 border-2 border-yellow-700",
+                    },
+                  },
                   element: htmlElement,
                   content: JSON.parse(doc) as string,
                   extensions: [
@@ -451,8 +469,6 @@ const Editor = ({
   const stepsSince = useQuery("getStepsSince", docId, version);
 
   React.useEffect(() => {
-    console.log(`stepsSince for ${docId}, version ${version}`, stepsSince);
-
     pipe(
       stepsSince,
       option.fromNullable,

@@ -6,7 +6,10 @@ export default query(
   async ({
     db,
   }): Promise<
-    Map<Id<"docs">, { doc: Document<"docs">["doc"]; version: number }>
+    Map<
+      Id<"docs">,
+      { doc: Document<"docs">["doc"]; creationTime: number; version: number }
+    >
   > =>
     db
       .query("docs")
@@ -18,6 +21,7 @@ export default query(
               getVersion(db, doc._id).then((version) =>
                 result.set(doc._id, {
                   doc: doc.doc,
+                  creationTime: doc._creationTime,
                   version,
                 })
               )
@@ -25,7 +29,11 @@ export default query(
           Promise.resolve(
             new Map<
               Id<"docs">,
-              { doc: Document<"docs">["doc"]; version: number }
+              {
+                doc: Document<"docs">["doc"];
+                creationTime: number;
+                version: number;
+              }
             >()
           )
         )
