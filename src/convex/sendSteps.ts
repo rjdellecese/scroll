@@ -32,7 +32,7 @@ export default mutation(
 
           db.insert("steps", {
             noteId,
-            step,
+            proseMirrorStep: step,
             clientId: clientId,
             position: persistedVersion + currentIndex + 1,
           });

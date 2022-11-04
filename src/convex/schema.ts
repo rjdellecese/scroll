@@ -7,7 +7,7 @@ export default defineSchema({
   steps: defineTable({
     noteId: s.id("notes"),
     position: s.number(),
-    step: s.string(),
+    proseMirrorStep: s.string(),
     clientId: s.string(),
   }).index("by_note_id_and_position", ["noteId", "position"]),
 });

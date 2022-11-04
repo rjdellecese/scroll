@@ -6,7 +6,7 @@ export default query(
     { db },
     noteId: Id<"notes">,
     version: number
-  ): Promise<{ step: string; clientId: string }[]> =>
+  ): Promise<{ proseMirrorStep: string; clientId: string }[]> =>
     db
       .query("steps")
       .withIndex("by_note_id_and_position", (q) =>
@@ -17,7 +17,7 @@ export default query(
         steps.reduce<
           Promise<
             {
-              step: Document<"steps">["step"];
+              proseMirrorStep: Document<"steps">["proseMirrorStep"];
               clientId: Document<"steps">["clientId"];
             }[]
           >
@@ -26,7 +26,7 @@ export default query(
             resultPromise.then((result) => [
               ...result,
               {
-                step: step.step,
+                proseMirrorStep: step.proseMirrorStep,
                 clientId: step.clientId,
               },
             ]),

@@ -114,7 +114,7 @@ type InitializedEditorMsg =
   | { _tag: "StepsSent" }
   | {
       _tag: "ReceivedSteps";
-      steps: NonEmptyArray<{ step: string; clientId: string }>;
+      steps: NonEmptyArray<{ proseMirrorStep: string; clientId: string }>;
     }
   | { _tag: "ComponentWillUnmount" };
 
@@ -267,15 +267,15 @@ export const update =
 
 const receiveTransactionCmd: (
   editor: TiptapEditor,
-  steps: NonEmptyArray<{ step: string; clientId: string }>
+  steps: NonEmptyArray<{ proseMirrorStep: string; clientId: string }>
 ) => Cmd<never> = (editor, steps_) => {
   const { steps, clientIds } = nonEmptyArray.reduce<
-    { step: string; clientId: string },
+    { proseMirrorStep: string; clientId: string },
     { steps: Step[]; clientIds: string[] }
   >({ steps: [], clientIds: [] }, (result, step) => ({
     steps: [
       ...result.steps,
-      Step.fromJSON(editor.schema, JSON.parse(step.step)),
+      Step.fromJSON(editor.schema, JSON.parse(step.proseMirrorStep)),
     ],
     clientIds: [...result.clientIds, step.clientId],
   }))(steps_);
@@ -378,6 +378,7 @@ const initializeEditorCmd = ({
                     },
                   },
                   element: htmlElement,
+                  // eslint-disable-next-line no-type-assertion/no-type-assertion
                   content: JSON.parse(proseMirrorDoc) as string,
                   extensions: [
                     ...extensions,

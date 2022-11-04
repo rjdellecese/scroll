@@ -34,7 +34,6 @@ export const init: Model = {
 
 export type Msg =
   | { _tag: "CreateNoteButtonClicked" }
-  | { _tag: "NoteCreated"; noteId: Id<"notes"> }
   | {
       _tag: "GotNotes";
       idsToNotes: Map<
@@ -54,17 +53,8 @@ export const update =
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with([{ _tag: "CreateNoteButtonClicked" }, P.any], () => [
         model,
-        runMutation(convex.mutation("createEmptyNote"), (noteId) =>
-          option.some({
-            _tag: "NoteCreated",
-            noteId: noteId,
-          })
-        ),
+        runMutation(convex.mutation("createEmptyNote"), () => option.none),
       ])
-      .with([{ _tag: "NoteCreated", noteId: P.select() }, P.any], () => {
-        // TODO
-        return [model, cmd.none];
-      })
       .with(
         [
           {

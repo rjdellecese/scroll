@@ -2,7 +2,8 @@ import { describe, expect, test } from "@jest/globals";
 import type { Arbitrary } from "fast-check";
 import * as fc from "fast-check";
 import { array, string } from "fp-ts";
-import { fromLocationPathname } from "src/elm-ts/route";
+
+import { fromLocationPathname } from "~src/elm-ts/route";
 
 describe("router", () => {
   test('parses "" or "/" as the home route', () => {
