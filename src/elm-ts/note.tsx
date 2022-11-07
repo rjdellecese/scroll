@@ -5,6 +5,7 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
+import type { magma } from "fp-ts";
 import { io, nonEmptyArray, number, option, readonlyArray, tuple } from "fp-ts";
 import { constVoid, flow, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
@@ -60,6 +61,10 @@ export const Ord: ord.Ord<Model> = {
   equals: (x, y) => x.noteId.equals(y.noteId),
   compare: (first, second) =>
     number.Ord.compare(first.creationTime, second.creationTime),
+};
+
+export const Magma: magma.Magma<Model> = {
+  concat: (x, _y) => x,
 };
 
 export const init = ({

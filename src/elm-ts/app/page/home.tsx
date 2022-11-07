@@ -5,7 +5,7 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { array, map, option, tuple } from "fp-ts";
-import { apply, constVoid, identity, pipe } from "fp-ts/function";
+import { apply, constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
@@ -42,6 +42,13 @@ export type Msg =
       >;
     }
   | {
+      _tag: "GotNotesSince";
+      idsToNotes: Map<
+        Id<"notes">,
+        { proseMirrorDoc: string; creationTime: number; version: number }
+      >;
+    }
+  | {
       _tag: "GotNoteMsg";
       noteId: Id<"notes">;
       msg: note.Msg;
@@ -51,10 +58,13 @@ export const update =
   (stage: Stage, convex: ConvexReactClient<API>) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
-      .with([{ _tag: "CreateNoteButtonClicked" }, P.any], () => [
-        model,
-        runMutation(convex.mutation("createEmptyNote"), () => option.none),
-      ])
+      .with(
+        [{ _tag: "CreateNoteButtonClicked" }, { _tag: "LoadedNotes" }],
+        () => [
+          model,
+          runMutation(convex.mutation("createEmptyNote"), () => option.none),
+        ]
+      )
       .with(
         [
           {
@@ -63,53 +73,30 @@ export const update =
           },
           { _tag: "LoadingNotes" },
         ],
-        (idsToNotes) =>
+        flow(
+          idsToNotesToIdsToNoteModels,
+          tuple.mapFst((idsToNoteModels) => ({
+            _tag: "LoadedNotes",
+            idsToNoteModels,
+          }))
+        )
+      )
+      .with(
+        [
+          { _tag: "GotNotesSince", idsToNotes: P.select("idsToNotes") },
+          { _tag: "LoadedNotes", idsToNoteModels: P.select("idsToNoteModels") },
+        ],
+        ({ idsToNotes, idsToNoteModels }) =>
           pipe(
             idsToNotes,
-            map.reduceWithIndex<Id<"notes">>(id.getOrd<"notes">())<
-              {
-                idsToNoteModels: Map<Id<"notes">, note.Model>;
-                cmds: Cmd<Msg>[];
-              },
-              {
-                proseMirrorDoc: Document<"notes">["proseMirrorDoc"];
-                creationTime: number;
-                version: number;
-              }
-            >(
-              {
-                idsToNoteModels: new Map(),
-                cmds: [],
-              },
-              (
-                noteId,
-                { idsToNoteModels, cmds },
-                { proseMirrorDoc, creationTime, version }
-              ) =>
-                pipe(
-                  note.init({ noteId, creationTime, proseMirrorDoc, version }),
-                  tuple.mapSnd(
-                    cmd.map(
-                      (noteMsg): Msg => ({
-                        _tag: "GotNoteMsg",
-                        noteId,
-                        msg: noteMsg,
-                      })
-                    )
-                  ),
-                  ([noteModel, cmd_]) => ({
-                    idsToNoteModels: map.upsertAt(id.getEq<"notes">())(
-                      noteId,
-                      noteModel
-                    )(idsToNoteModels),
-                    cmds: array.append(cmd_)(cmds),
-                  })
-                )
-            ),
-            ({ idsToNoteModels, cmds }) => [
-              { _tag: "LoadedNotes", idsToNoteModels },
-              cmd.batch(cmds),
-            ]
+            idsToNotesToIdsToNoteModels,
+            tuple.mapFst((idsToNoteModels_) => ({
+              _tag: "LoadedNotes",
+              idsToNoteModels: map.union(
+                id.getEq<"notes">(),
+                note.Magma
+              )(idsToNoteModels_)(idsToNoteModels),
+            }))
           )
       )
       .with(
@@ -156,6 +143,61 @@ export const update =
         ),
       ]);
 
+const idsToNotesToIdsToNoteModels = (
+  idsToNotes: Map<
+    Id<"notes">,
+    {
+      proseMirrorDoc: Document<"notes">["proseMirrorDoc"];
+      creationTime: number;
+      version: number;
+    }
+  >
+): [Map<Id<"notes">, note.Model>, Cmd<Msg>] =>
+  pipe(
+    idsToNotes,
+    map.reduceWithIndex<Id<"notes">>(id.getOrd<"notes">())<
+      {
+        idsToNoteModels: Map<Id<"notes">, note.Model>;
+        cmds: Cmd<Msg>[];
+      },
+      {
+        proseMirrorDoc: Document<"notes">["proseMirrorDoc"];
+        creationTime: number;
+        version: number;
+      }
+    >(
+      {
+        idsToNoteModels: new Map(),
+        cmds: [],
+      },
+      (
+        noteId,
+        { idsToNoteModels, cmds },
+        { proseMirrorDoc, creationTime, version }
+      ) =>
+        pipe(
+          note.init({ noteId, creationTime, proseMirrorDoc, version }),
+          tuple.mapSnd(
+            cmd.map(
+              (noteMsg): Msg => ({
+                _tag: "GotNoteMsg",
+                noteId,
+                msg: noteMsg,
+              })
+            )
+          ),
+          ([noteModel, cmd_]) => ({
+            idsToNoteModels: map.upsertAt(id.getEq<"notes">())(
+              noteId,
+              noteModel
+            )(idsToNoteModels),
+            cmds: array.append(cmd_)(cmds),
+          })
+        )
+    ),
+    ({ idsToNoteModels, cmds }) => [idsToNoteModels, cmd.batch(cmds)]
+  );
+
 // VIEW
 
 export const view: (model: Model) => Html<Msg> = (model) =>
@@ -166,7 +208,21 @@ export const view: (model: Model) => Html<Msg> = (model) =>
     .with(
       { _tag: "LoadedNotes", idsToNoteModels: P.select() },
       (idsToNoteModels) => (dispatch) =>
-        <LoadedNotes dispatch={dispatch} idsToNoteModels={idsToNoteModels} />
+        pipe(
+          idsToNoteModels,
+          map.values(note.Ord),
+          array.last,
+          option.match(
+            () => <></>,
+            ({ creationTime }) => (
+              <LoadedNotes
+                dispatch={dispatch}
+                idsToNoteModels={idsToNoteModels}
+                latestCreationTime={creationTime}
+              />
+            )
+          )
+        )
     )
     .exhaustive();
 
@@ -199,37 +255,62 @@ const LoadingNotes = ({
 
 const LoadedNotes = ({
   dispatch,
-  idsToNoteModels: editors,
+  idsToNoteModels,
+  latestCreationTime,
 }: {
   dispatch: Dispatch<Msg>;
   idsToNoteModels: Map<Id<"notes">, note.Model>;
-}): ReactElement => (
-  <>
-    {pipe(
-      editors,
-      map.values(note.Ord),
-      array.map((editorModel) => (
-        <React.Fragment key={editorModel.noteId.toString()}>
-          {pipe(
-            editorModel,
-            note.view,
-            html.map(
-              (editorMsg): Msg => ({
-                _tag: "GotNoteMsg",
-                noteId: editorModel.noteId,
-                msg: editorMsg,
+  latestCreationTime: number;
+}): ReactElement => {
+  const notesSince = option.fromNullable(
+    useQuery("getNotesSince", latestCreationTime)
+  );
+
+  React.useEffect(
+    () =>
+      pipe(
+        notesSince,
+        option.match(
+          () => constVoid,
+          (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
+            () =>
+              dispatch({
+                _tag: "GotNotesSince",
+                idsToNotes,
               })
-            ),
-            apply(dispatch)
-          )}
-        </React.Fragment>
-      ))
-    )}
-    <button onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}>
-      Create note
-    </button>
-  </>
-);
+        )
+      )(),
+    [notesSince, dispatch]
+  );
+
+  return (
+    <>
+      {pipe(
+        idsToNoteModels,
+        map.values(note.Ord),
+        array.map((noteModel) => (
+          <React.Fragment key={noteModel.noteId.toString()}>
+            {pipe(
+              noteModel,
+              note.view,
+              html.map(
+                (noteMsg): Msg => ({
+                  _tag: "GotNoteMsg",
+                  noteId: noteModel.noteId,
+                  msg: noteMsg,
+                })
+              ),
+              apply(dispatch)
+            )}
+          </React.Fragment>
+        ))
+      )}
+      <button onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}>
+        Create note
+      </button>
+    </>
+  );
+};
 
 // SUBSCRIPTIONS
 
