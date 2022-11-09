@@ -71,7 +71,7 @@ export const update =
             _tag: "GotNotes",
             idsToNotes: P.select(),
           },
-          { _tag: "LoadingNotes" },
+          { _tag: P.union("LoadingNotes", "LoadedNotes") },
         ],
         flow(
           idsToNotesToIdsToNoteModels,
@@ -213,7 +213,7 @@ export const view: (model: Model) => Html<Msg> = (model) =>
           map.values(note.Ord),
           array.last,
           option.match(
-            () => <></>,
+            () => <NoNotes dispatch={dispatch} />,
             ({ creationTime }) => (
               <LoadedNotes
                 dispatch={dispatch}
@@ -305,12 +305,43 @@ const LoadedNotes = ({
           </React.Fragment>
         ))
       )}
-      <button onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}>
-        Create note
-      </button>
+      <CreateNoteButton dispatch={dispatch} />
     </>
   );
 };
+
+const NoNotes = ({ dispatch }: { dispatch: Dispatch<Msg> }): ReactElement => {
+  const notes = option.fromNullable(useQuery("getNotes"));
+
+  React.useEffect(
+    () =>
+      pipe(
+        notes,
+        option.match(
+          () => constVoid,
+          (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
+            () =>
+              dispatch({
+                _tag: "GotNotes",
+                idsToNotes,
+              })
+        )
+      )(),
+    [notes, dispatch]
+  );
+
+  return <CreateNoteButton dispatch={dispatch} />;
+};
+
+const CreateNoteButton = ({
+  dispatch,
+}: {
+  dispatch: Dispatch<Msg>;
+}): ReactElement => (
+  <button onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}>
+    Create note
+  </button>
+);
 
 // SUBSCRIPTIONS
 
