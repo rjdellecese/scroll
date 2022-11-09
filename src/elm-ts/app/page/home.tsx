@@ -273,11 +273,17 @@ const LoadedNotes = ({
         option.match(
           () => constVoid,
           (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
-            () =>
-              dispatch({
-                _tag: "GotNotesSince",
-                idsToNotes,
-              })
+            match(map.isEmpty(idsToNotes))
+              .with(
+                false,
+                () => () =>
+                  dispatch({
+                    _tag: "GotNotesSince",
+                    idsToNotes,
+                  })
+              )
+              .with(true, () => constVoid)
+              .exhaustive()
         )
       )(),
     [notesSince, dispatch]
