@@ -8,7 +8,7 @@
     @apply text-2xl;
   }
   h2 {
-    @apply text-2xl font-bold mt-7 mb-4;
+    @apply text-2xl font-extrabold mt-7 mb-4;
   }
   h2 code {
     @apply text-xl;
@@ -46,9 +46,43 @@
   ol > li p {
     @apply my-0;
   }
-  /* Selects top-level `ul`s and `ol`s. */
-  *:not(li) > ul,
-  *:not(li) > ol {
+  ul[data-type="taskList"] {
+    @apply pl-0 list-none;
+  }
+  ul[data-type="taskList"] ul:not([data-type="taskList"]) {
+    @apply list-disc;
+  }
+  ul[data-type="taskList"] ol:not([data-type="taskList"]) {
+    @apply list-decimal;
+  }
+  ul[data-type="taskList"] :is(ol, ul) li:last-of-type {
+    @apply mb-0;
+  }
+  ul[data-type="taskList"] li {
+    @apply flex;
+  }
+  ul[data-type="taskList"] ul:not([data-type="taskList"]) li {
+    @apply list-item;
+  }
+  ul[data-type="taskList"] ol:not([data-type="taskList"]) li {
+    @apply list-item;
+  }
+  ul[data-type="taskList"] li > label {
+    @apply flex-shrink-0 flex-grow-0 mr-2;
+  }
+  ul[data-type="taskList"] li > div {
+    @apply flex-auto break-all;
+  }
+  input[type="checkbox"] {
+    @apply checked:accent-yellow-700;
+  }
+  /* Tries to select top-level `ul`s and `ol`s only.
+   *
+   * :not(li) accounts for ordered and unordered lists
+   * :not(li > div) accounts for checklists
+   */
+  *:not(li, li > div) > ul,
+  *:not(li, li > div) > ol {
     @apply my-4;
   }
   blockquote {

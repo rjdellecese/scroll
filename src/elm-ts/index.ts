@@ -1,6 +1,6 @@
 import "@fontsource/jetbrains-mono/variable.css";
-import "@fontsource/inter/variable.css";
-import "@fontsource/inter/variable-italic.css";
+import "@fontsource/mulish/variable.css";
+import "@fontsource/mulish/variable-italic.css";
 import "@fontsource/lora/variable.css";
 import "@fontsource/lora/variable-italic.css";
 
