@@ -1,3 +1,75 @@
 @tailwind base;
+
+@layer base {
+  h1 {
+    @apply text-3xl font-extrabold mt-8 mb-5;
+  }
+  h1 code {
+    @apply text-2xl;
+  }
+  h2 {
+    @apply text-2xl font-bold mt-7 mb-4;
+  }
+  h2 code {
+    @apply text-xl;
+  }
+  h3 {
+    @apply text-xl font-bold mt-7 mb-4;
+  }
+  h3 code {
+    @apply text-lg;
+  }
+  h4 {
+    @apply text-lg font-bold mt-6 mb-3;
+  }
+  h4 code {
+    @apply text-base;
+  }
+  p {
+    @apply my-4;
+  }
+  ul {
+    @apply list-disc;
+  }
+  ol {
+    @apply list-decimal;
+  }
+  ul,
+  ol {
+    @apply pl-4;
+  }
+  ul > li,
+  ol > li {
+    @apply my-1;
+  }
+  ul > li p,
+  ol > li p {
+    @apply my-0;
+  }
+  /* Selects top-level `ul`s and `ol`s. */
+  *:not(li) > ul,
+  *:not(li) > ol {
+    @apply my-4;
+  }
+  blockquote {
+    @apply my-6 pl-4 border-l-2 border-stone-500;
+  }
+  pre {
+    @apply bg-stone-200 p-4 rounded-lg;
+  }
+  *:not(pre) > code {
+    @apply p-1 rounded-md;
+  }
+  code {
+    @apply text-sm bg-stone-200;
+  }
+  hr {
+    @apply border-t-2 border-stone-300;
+  }
+  a {
+    @apply text-blue-600 underline;
+  }
+}
+
 @tailwind components;
 @tailwind utilities;

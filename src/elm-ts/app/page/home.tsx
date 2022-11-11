@@ -200,31 +200,35 @@ const idsToNotesToIdsToNoteModels = (
 
 // VIEW
 
-export const view: (model: Model) => Html<Msg> = (model) =>
-  match<Model, Html<Msg>>(model)
-    .with({ _tag: "LoadingNotes" }, () => (dispatch) => (
-      <LoadingNotes dispatch={dispatch} />
-    ))
-    .with(
-      { _tag: "LoadedNotes", idsToNoteModels: P.select() },
-      (idsToNoteModels) => (dispatch) =>
-        pipe(
-          idsToNoteModels,
-          map.values(note.Ord),
-          array.last,
-          option.match(
-            () => <NoNotes dispatch={dispatch} />,
-            ({ creationTime }) => (
-              <LoadedNotes
-                dispatch={dispatch}
-                idsToNoteModels={idsToNoteModels}
-                latestCreationTime={creationTime}
-              />
+export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
+  (
+    <div className="flex flex-col w-full items-center">
+      {match<Model, ReactElement>(model)
+        .with({ _tag: "LoadingNotes" }, () => (
+          <LoadingNotes dispatch={dispatch} />
+        ))
+        .with(
+          { _tag: "LoadedNotes", idsToNoteModels: P.select() },
+          (idsToNoteModels) =>
+            pipe(
+              idsToNoteModels,
+              map.values(note.Ord),
+              array.last,
+              option.match(
+                () => <NoNotes dispatch={dispatch} />,
+                ({ creationTime }) => (
+                  <LoadedNotes
+                    dispatch={dispatch}
+                    idsToNoteModels={idsToNoteModels}
+                    latestCreationTime={creationTime}
+                  />
+                )
+              )
             )
-          )
         )
-    )
-    .exhaustive();
+        .exhaustive()}
+    </div>
+  );
 
 const LoadingNotes = ({
   dispatch,
@@ -290,7 +294,7 @@ const LoadedNotes = ({
   );
 
   return (
-    <>
+    <div className="flex-auto max-w-3xl">
       {pipe(
         idsToNoteModels,
         map.values(note.Ord),
@@ -312,7 +316,7 @@ const LoadedNotes = ({
         ))
       )}
       <CreateNoteButton dispatch={dispatch} />
-    </>
+    </div>
   );
 };
 

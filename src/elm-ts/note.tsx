@@ -379,7 +379,7 @@ const initializeEditorCmd = ({
                 editor: new TiptapEditor({
                   editorProps: {
                     attributes: {
-                      class: "p-2 border-2 border-yellow-700",
+                      class: "py-2 px-8 border-2 border-yellow-700",
                     },
                   },
                   element: htmlElement,

@@ -1,3 +1,9 @@
+import "@fontsource/jetbrains-mono/variable.css";
+import "@fontsource/inter/variable.css";
+import "@fontsource/inter/variable-italic.css";
+import "@fontsource/lora/variable.css";
+import "@fontsource/lora/variable-italic.css";
+
 import * as Sentry from "@sentry/browser";
 import { BrowserTracing } from "@sentry/tracing";
 import { programWithDebuggerWithFlags } from "elm-ts/lib/Debug/Navigation";
