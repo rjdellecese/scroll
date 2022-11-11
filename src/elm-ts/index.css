@@ -101,7 +101,7 @@
     @apply border-t-2 border-stone-300;
   }
   a {
-    @apply text-blue-600 underline;
+    @apply text-yellow-600 hover:text-yellow-500 cursor-pointer underline;
   }
 }
 
