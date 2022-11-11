@@ -60,7 +60,7 @@
     "@tiptap/extension-typography": "^2.0.0-beta.202",
     "@tiptap/extension-underline": "^2.0.0-beta.199",
     "@tiptap/starter-kit": "^2.0.0-beta.199",
-    "convex": "^0.3.1",
+    "convex": "^0.4.0",
     "elm-ts": "npm:@rjdellecese/elm-ts@^0.8.1",
     "fp-ts": "^2.12.3",
     "fp-ts-routing": "^0.5.4",
