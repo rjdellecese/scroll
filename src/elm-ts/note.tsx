@@ -446,7 +446,7 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
               noteId={noteId}
               clientId={clientId}
               version={version}
-            ></Editor>
+            />
           ))
           .with({ _tag: "None" }, () => <></>)
           .exhaustive()
@@ -457,7 +457,7 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
         noteId={noteId}
         clientId={clientId}
         version={collab.getVersion(editor.state)}
-      ></Editor>
+      />
     ))
     .exhaustive();
 
@@ -512,7 +512,7 @@ const Editor = ({
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div id={editorId(clientId)} className="flex-grow"></div>;
+  return <div id={editorId(clientId)} className="flex-grow" />;
 };
 
 const editorId = (clientId: string): string => `editor-${clientId}`;

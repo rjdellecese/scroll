@@ -15,6 +15,7 @@ module.exports = {
     "simple-import-sort",
     "no-type-assertion",
     "unicorn",
+    "react",
   ],
   root: true,
   rules: {
@@ -48,9 +49,13 @@ module.exports = {
       parserOptions: {
         tsconfigRootDir: __dirname,
         project: ["./tsconfig.json"],
+        ecmaFeatures: {
+          jsx: true,
+        },
       },
       rules: {
         "unicorn/filename-case": ["error", { case: "kebabCase" }],
+        "react/self-closing-comp": "warn",
       },
     },
     {
