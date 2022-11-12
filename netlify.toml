@@ -13,4 +13,4 @@
   package = "@sentry/netlify-build-plugin"
   [plugins.inputs]
     sentryOrg = "rj-dellecese"
-    sentryProject = "forever-note"
+    sentryProject = "scroll"

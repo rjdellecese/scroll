@@ -1,5 +1,5 @@
 {
-  "name": "forever-note",
+  "name": "scroll",
   "private": "true",
   "scripts": {
     "start": "convex dev --once && concurrently --restart-tries=-1 --prefix-colors=\"black.bold.bgCyan,black.bold.bgYellow\" --prefix=\" {name} \" --names=\"NETLIFY,CONVEX\" \"BROWSER=none netlify dev\" \"convex dev\"",
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/forever-note/forever-note.git"
+    "url": "git+https://github.com/rjdellecese/scroll.git"
   },
   "devDependencies": {
     "@parcel/validator-typescript": "^2.7.0",
