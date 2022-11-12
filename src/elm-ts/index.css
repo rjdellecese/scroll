@@ -89,7 +89,7 @@
     @apply my-6 pl-4 border-l-2 border-stone-500;
   }
   pre {
-    @apply bg-stone-200 p-4 rounded-lg;
+    @apply bg-stone-200 my-4 p-4 rounded-lg;
   }
   *:not(pre) > code {
     @apply p-1 rounded-md;
