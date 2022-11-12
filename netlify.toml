@@ -4,7 +4,7 @@
 [functions]
   directory = "src/netlify/"
 [dev]
-  command = "parcel src/elm-ts/index.html"
+  command = "parcel serve src/elm-ts/index.html"
 [[redirects]]
   from = "/*"
   to = "/index.html"

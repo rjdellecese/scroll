@@ -202,7 +202,7 @@ const idsToNotesToIdsToNoteModels = (
 
 export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
   (
-    <div className="flex flex-col w-full items-center">
+    <div className="flex w-full justify-center">
       {match<Model, ReactElement>(model)
         .with({ _tag: "LoadingNotes" }, () => (
           <LoadingNotes dispatch={dispatch} />
@@ -294,7 +294,7 @@ const LoadedNotes = ({
   );
 
   return (
-    <div className="flex-auto max-w-3xl">
+    <div className="flex flex-col flex-grow max-w-3xl">
       {pipe(
         idsToNoteModels,
         map.values(note.Ord),

@@ -379,7 +379,7 @@ const initializeEditorCmd = ({
                 editor: new TiptapEditor({
                   editorProps: {
                     attributes: {
-                      class: "py-2 px-8 border-2 border-yellow-700",
+                      class: "flex-grow py-2 px-8 border-2 border-yellow-700",
                     },
                   },
                   element: htmlElement,
@@ -512,7 +512,7 @@ const Editor = ({
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div id={editorId(clientId)}></div>;
+  return <div id={editorId(clientId)} className="flex-grow"></div>;
 };
 
 const editorId = (clientId: string): string => `editor-${clientId}`;
