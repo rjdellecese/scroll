@@ -15,6 +15,7 @@ import type { API } from "~src/convex/_generated/api";
 import type { Document, Id } from "~src/convex/_generated/dataModel";
 import { useQuery } from "~src/convex/_generated/react";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
+import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
 import * as logMessage from "~src/elm-ts/log-message";
 import * as note from "~src/elm-ts/note";
 import type { Stage } from "~src/elm-ts/stage";
@@ -202,7 +203,7 @@ const idsToNotesToIdsToNoteModels = (
 
 export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
   (
-    <div className="flex w-full justify-center">
+    <div className="flex justify-center">
       {match<Model, ReactElement>(model)
         .with({ _tag: "LoadingNotes" }, () => (
           <LoadingNotes dispatch={dispatch} />
@@ -254,7 +255,11 @@ const LoadingNotes = ({
     [notes, dispatch]
   );
 
-  return <p>Loading notes…</p>;
+  return (
+    <div className="grid h-screen items-center justify-center">
+      <LoadingSpinner />
+    </div>
+  );
 };
 
 const LoadedNotes = ({
@@ -294,7 +299,7 @@ const LoadedNotes = ({
   );
 
   return (
-    <div className="flex flex-col flex-grow max-w-3xl">
+    <div className="flex flex-col flex-grow max-w-3xl divide-y-2 divide-stone">
       {pipe(
         idsToNoteModels,
         map.values(note.Ord),

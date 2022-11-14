@@ -379,7 +379,7 @@ const initializeEditorCmd = ({
                 editor: new TiptapEditor({
                   editorProps: {
                     attributes: {
-                      class: "flex-grow py-2 px-8 border-2 border-yellow-700",
+                      class: "flex-grow py-4 px-8 focus:outline-none",
                     },
                   },
                   element: htmlElement,
@@ -390,7 +390,7 @@ const initializeEditorCmd = ({
                     Placeholder.configure({
                       placeholder: "Write something…",
                       emptyNodeClass:
-                        "first:before:h-0 first:before:text-gray-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none",
+                        "first:before:h-0 first:before:text-stone-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none",
                     }),
                     Extension.create({
                       addProseMirrorPlugins: () => [

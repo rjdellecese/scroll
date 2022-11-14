@@ -15,9 +15,10 @@ import { match, P } from "ts-pattern";
 import type { API } from "~src/convex/_generated/api";
 import clientConfig from "~src/convex/_generated/clientConfig";
 import * as page from "~src/elm-ts/app/page";
+import { appearance } from "~src/elm-ts/clerk-appearance";
 import type { Flags } from "~src/elm-ts/flags";
+import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
 import type { Stage } from "~src/elm-ts/stage";
-import LoadingSpinner from "./loading-spinner";
 
 // MODEL
 
@@ -116,10 +117,17 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) => {
   const clerkClassNames = "self-center place-self-center justify-self-center";
 
   return (
-    <ClerkProvider frontendApi="clerk.concise.escargot-18.lcl.dev">
+    <ClerkProvider
+      frontendApi="clerk.concise.escargot-18.lcl.dev"
+      appearance={appearance}
+    >
       <ConvexProviderWithClerk
         convexClient={model.convex}
-        loading={<LoadingSpinner className={clerkClassNames} />}
+        loading={
+          <div className="grid h-screen">
+            <LoadingSpinner className={clerkClassNames} />
+          </div>
+        }
       >
         {pipe(
           model.page,
