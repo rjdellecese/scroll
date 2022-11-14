@@ -47,6 +47,7 @@
     "url": "^0.11.0"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^4.4.1",
     "@fontsource/jetbrains-mono": "^4.5.11",
     "@fontsource/lora": "^4.5.12",
     "@fontsource/mulish": "^4.5.13",

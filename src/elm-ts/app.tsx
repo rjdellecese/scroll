@@ -1,3 +1,4 @@
+import { ClerkProvider, RedirectToSignIn, useAuth } from "@clerk/clerk-react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProvider } from "convex/react";
 import { cmd, react as html, sub } from "elm-ts";
@@ -7,7 +8,8 @@ import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { tuple } from "fp-ts";
 import { apply, pipe } from "fp-ts/lib/function";
-import React from "react";
+import type { ReactElement, ReactNode } from "react";
+import React, { useEffect, useState } from "react";
 import { match, P } from "ts-pattern";
 
 import type { API } from "~src/convex/_generated/api";
@@ -15,6 +17,7 @@ import clientConfig from "~src/convex/_generated/clientConfig";
 import * as page from "~src/elm-ts/app/page";
 import type { Flags } from "~src/elm-ts/flags";
 import type { Stage } from "~src/elm-ts/stage";
+import LoadingSpinner from "./loading-spinner";
 
 // MODEL
 
@@ -68,16 +71,64 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
 
 // VIEW
 
+const ConvexProviderWithClerk = ({
+  children,
+  convexClient,
+  loading,
+  loggedOut,
+}: {
+  children?: ReactNode;
+  convexClient: ConvexReactClient<API>;
+  loading?: ReactElement;
+  loggedOut?: ReactElement;
+}) => {
+  const { getToken, isSignedIn, isLoaded } = useAuth();
+  const [clientAuthed, setClientAuthed] = useState(false);
+
+  useEffect(() => {
+    async function setAuth() {
+      const token = await getToken({ template: "convex", skipCache: true });
+      if (token) {
+        convexClient.setAuth(token);
+        setClientAuthed(true);
+      }
+    }
+
+    if (isSignedIn) {
+      const intervalId = setInterval(() => setAuth(), 50000);
+      setAuth();
+      return () => {
+        clearInterval(intervalId);
+      };
+    }
+  }, [convexClient, getToken, isSignedIn]);
+
+  if (!isLoaded || (isSignedIn && !clientAuthed)) {
+    return loading || null;
+  } else if (!isSignedIn) {
+    return loggedOut || <RedirectToSignIn />;
+  }
+
+  return <ConvexProvider client={convexClient}>{children}</ConvexProvider>;
+};
+
 export const view: (model: Model) => Html<Msg> = (model) => (dispatch) => {
+  const clerkClassNames = "self-center place-self-center justify-self-center";
+
   return (
-    <ConvexProvider client={model.convex}>
-      {pipe(
-        model.page,
-        page.view,
-        html.map((pageMsg): Msg => ({ _tag: "GotPageMsg", msg: pageMsg })),
-        apply(dispatch)
-      )}
-    </ConvexProvider>
+    <ClerkProvider frontendApi="clerk.concise.escargot-18.lcl.dev">
+      <ConvexProviderWithClerk
+        convexClient={model.convex}
+        loading={<LoadingSpinner className={clerkClassNames} />}
+      >
+        {pipe(
+          model.page,
+          page.view,
+          html.map((pageMsg): Msg => ({ _tag: "GotPageMsg", msg: pageMsg })),
+          apply(dispatch)
+        )}
+      </ConvexProviderWithClerk>
+    </ClerkProvider>
   );
 };
 
