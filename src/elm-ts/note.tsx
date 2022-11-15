@@ -35,9 +35,9 @@ import type { Stage } from "./stage";
 
 // MODEL
 
-export type Model = InitializingEditorModel | InitializedEditorModel;
+export type Model = InitializingNoteModel | InitializedNoteModel;
 
-type InitializingEditorModel = {
+type InitializingNoteModel = {
   _tag: "InitializingEditor";
   noteId: Id<"notes">;
   creationTime: number;
@@ -47,7 +47,7 @@ type InitializingEditorModel = {
   didComponentMount: boolean;
 };
 
-type InitializedEditorModel = {
+type InitializedNoteModel = {
   _tag: "InitializedEditor";
   noteId: Id<"notes">;
   creationTime: number;
@@ -99,6 +99,12 @@ export const init = ({
   ),
 ];
 
+export const isLoaded = (model: Model): boolean =>
+  match(model)
+    .with({ _tag: "InitializedEditor" }, () => true)
+    .with({ _tag: "InitializingEditor" }, () => false)
+    .exhaustive();
+
 // UPDATE
 
 export type Msg =
@@ -133,27 +139,27 @@ export const update =
             _tag: "GotInitializingEditorMsg",
             msg: P.select("initializingEditorMsg"),
           },
-          P.select("initializingEditorModel", { _tag: "InitializingEditor" }),
+          P.select("initializingNoteModel", { _tag: "InitializingEditor" }),
         ],
-        ({ initializingEditorMsg, initializingEditorModel }) =>
+        ({ initializingEditorMsg, initializingNoteModel }) =>
           match<InitializingEditorMsg, [Model, Cmd<Msg>]>(initializingEditorMsg)
             .with(
               { _tag: "GeneratedClientId", clientId: P.select() },
               (clientId) =>
                 pipe(
-                  initializingEditorModel,
-                  Lens.fromProp<InitializingEditorModel>()(
-                    "optionClientId"
-                  ).set(option.some(clientId)),
+                  initializingNoteModel,
+                  Lens.fromProp<InitializingNoteModel>()("optionClientId").set(
+                    option.some(clientId)
+                  ),
                   initializeEditorIfPossible(stage)
                 )
             )
             .with({ _tag: "ComponentDidMount" }, () =>
               pipe(
-                initializingEditorModel,
-                Lens.fromProp<InitializingEditorModel>()(
-                  "didComponentMount"
-                ).set(true),
+                initializingNoteModel,
+                Lens.fromProp<InitializingNoteModel>()("didComponentMount").set(
+                  true
+                ),
                 initializeEditorIfPossible(stage)
               )
             )
@@ -161,13 +167,13 @@ export const update =
               { _tag: "EditorWasInitialized" },
               ({ editor, callbackManager }): [Model, Cmd<Msg>] =>
                 match<Option<string>, [Model, Cmd<Msg>]>(
-                  initializingEditorModel.optionClientId
+                  initializingNoteModel.optionClientId
                 )
                   .with({ _tag: "Some", value: P.select() }, (clientId) => [
                     {
                       _tag: "InitializedEditor",
-                      noteId: initializingEditorModel.noteId,
-                      creationTime: initializingEditorModel.creationTime,
+                      noteId: initializingNoteModel.noteId,
+                      creationTime: initializingNoteModel.creationTime,
                       clientId,
                       editor,
                       callbackManager,
@@ -186,9 +192,9 @@ export const update =
             _tag: "GotInitializedEditorMsg",
             msg: P.select("initializedEditorMsg"),
           },
-          P.select("initializedEditorModel", { _tag: "InitializedEditor" }),
+          P.select("initializedNoteModel", { _tag: "InitializedEditor" }),
         ],
-        ({ initializedEditorMsg, initializedEditorModel }) =>
+        ({ initializedEditorMsg, initializedNoteModel }) =>
           tuple.mapSnd<Cmd<InitializedEditorMsg>, Cmd<Msg>>(
             cmd.map(
               (initializedEditorMsg_): Msg => ({
@@ -199,27 +205,27 @@ export const update =
           )(
             match<
               InitializedEditorMsg,
-              [InitializedEditorModel, Cmd<InitializedEditorMsg>]
+              [InitializedNoteModel, Cmd<InitializedEditorMsg>]
             >(initializedEditorMsg)
               .with({ _tag: "EditorTransactionApplied" }, () =>
                 match<
                   boolean,
-                  [InitializedEditorModel, Cmd<InitializedEditorMsg>]
-                >(initializedEditorModel.areStepsInFlight)
-                  .with(true, () => [initializedEditorModel, cmd.none])
+                  [InitializedNoteModel, Cmd<InitializedEditorMsg>]
+                >(initializedNoteModel.areStepsInFlight)
+                  .with(true, () => [initializedNoteModel, cmd.none])
                   .with(false, () =>
                     match<
                       ReturnType<typeof collab.sendableSteps>,
-                      [InitializedEditorModel, Cmd<InitializedEditorMsg>]
-                    >(collab.sendableSteps(initializedEditorModel.editor.state))
-                      .with(null, () => [initializedEditorModel, cmd.none])
+                      [InitializedNoteModel, Cmd<InitializedEditorMsg>]
+                    >(collab.sendableSteps(initializedNoteModel.editor.state))
+                      .with(null, () => [initializedNoteModel, cmd.none])
                       .with(P.not(null), ({ version, steps }) => [
-                        Lens.fromProp<InitializedEditorModel>()(
+                        Lens.fromProp<InitializedNoteModel>()(
                           "areStepsInFlight"
-                        ).set(true)(initializedEditorModel),
+                        ).set(true)(initializedNoteModel),
                         sendStepsCmd(
                           convex,
-                          initializedEditorModel,
+                          initializedNoteModel,
                           version,
                           steps
                         ),
@@ -231,34 +237,29 @@ export const update =
               .with({ _tag: "StepsSent" }, () =>
                 match<
                   ReturnType<typeof collab.sendableSteps>,
-                  [InitializedEditorModel, Cmd<InitializedEditorMsg>]
-                >(collab.sendableSteps(initializedEditorModel.editor.state))
+                  [InitializedNoteModel, Cmd<InitializedEditorMsg>]
+                >(collab.sendableSteps(initializedNoteModel.editor.state))
                   .with(null, () => [
-                    Lens.fromProp<InitializedEditorModel>()(
+                    Lens.fromProp<InitializedNoteModel>()(
                       "areStepsInFlight"
-                    ).set(false)(initializedEditorModel),
+                    ).set(false)(initializedNoteModel),
                     cmd.none,
                   ])
                   .with(P.not(null), ({ version, steps }) => [
-                    Lens.fromProp<InitializedEditorModel>()(
+                    Lens.fromProp<InitializedNoteModel>()(
                       "areStepsInFlight"
-                    ).set(true)(initializedEditorModel),
-                    sendStepsCmd(
-                      convex,
-                      initializedEditorModel,
-                      version,
-                      steps
-                    ),
+                    ).set(true)(initializedNoteModel),
+                    sendStepsCmd(convex, initializedNoteModel, version, steps),
                   ])
                   .exhaustive()
               )
               .with({ _tag: "ReceivedSteps" }, ({ steps }) => [
-                initializedEditorModel,
-                receiveTransactionCmd(initializedEditorModel.editor, steps),
+                initializedNoteModel,
+                receiveTransactionCmd(initializedNoteModel.editor, steps),
               ])
               .with({ _tag: "ComponentWillUnmount" }, () => [
-                initializedEditorModel,
-                destroyEditorCmd(initializedEditorModel.editor),
+                initializedNoteModel,
+                destroyEditorCmd(initializedNoteModel.editor),
               ])
               .exhaustive()
           )
@@ -302,13 +303,13 @@ const destroyEditorCmd = (editor: TiptapEditor): Cmd<never> =>
 const initializeEditorIfPossible =
   (stage: Stage) =>
   (
-    initializingEditorModel: InitializingEditorModel
-  ): [InitializingEditorModel, Cmd<Msg>] =>
+    initializingNoteModel: InitializingNoteModel
+  ): [InitializingNoteModel, Cmd<Msg>] =>
     pipe(
-      initializingEditorModel,
+      initializingNoteModel,
       initializeEditor(stage),
       option.match(
-        () => [initializingEditorModel, cmd.none],
+        () => [initializingNoteModel, cmd.none],
         tuple.mapSnd(
           cmd.map(
             (initializingEditorMsg_: InitializingEditorMsg): Msg => ({
@@ -323,12 +324,12 @@ const initializeEditorIfPossible =
 const initializeEditor =
   (stage: Stage) =>
   (
-    initializingEditorModel: InitializingEditorModel
-  ): Option<[InitializingEditorModel, Cmd<InitializingEditorMsg>]> =>
+    initializingNoteModel: InitializingNoteModel
+  ): Option<[InitializingNoteModel, Cmd<InitializingEditorMsg>]> =>
     match<
-      InitializingEditorModel,
-      Option<[InitializingEditorModel, Cmd<InitializingEditorMsg>]>
-    >(initializingEditorModel)
+      InitializingNoteModel,
+      Option<[InitializingNoteModel, Cmd<InitializingEditorMsg>]>
+    >(initializingNoteModel)
       .with(
         {
           optionClientId: { _tag: "Some", value: P.select("clientId") },
@@ -336,12 +337,12 @@ const initializeEditor =
         },
         ({ clientId }) =>
           option.some([
-            initializingEditorModel,
+            initializingNoteModel,
             initializeEditorCmd({
               stage,
               clientId,
-              proseMirrorDoc: initializingEditorModel.proseMirrorDoc,
-              version: initializingEditorModel.version,
+              proseMirrorDoc: initializingNoteModel.proseMirrorDoc,
+              version: initializingNoteModel.version,
             }),
           ])
       )
@@ -417,15 +418,15 @@ const initializeEditorCmd = ({
 
 const sendStepsCmd = (
   convex: ConvexReactClient<API>,
-  initializedEditorModel: InitializedEditorModel,
+  initializedNoteModel: InitializedNoteModel,
   version: number,
   steps: ReadonlyArray<Step>
 ): Cmd<InitializedEditorMsg> =>
   runMutation(
     convex.mutation("sendSteps"),
     () => option.some<InitializedEditorMsg>({ _tag: "StepsSent" }),
-    initializedEditorModel.noteId,
-    initializedEditorModel.clientId,
+    initializedNoteModel.noteId,
+    initializedNoteModel.clientId,
     version,
     readonlyArray
       .toArray(steps)
@@ -521,8 +522,8 @@ const editorId = (clientId: string): string => `editor-${clientId}`;
 
 export const subscriptions: (model: Model) => Sub<Msg> = (model) =>
   match<Model, Sub<Msg>>(model)
-    .with({ _tag: "InitializedEditor" }, (initializedEditorModel) =>
-      callbackManager.subscriptions(initializedEditorModel.callbackManager)
+    .with({ _tag: "InitializedEditor" }, (initializedNoteModel) =>
+      callbackManager.subscriptions(initializedNoteModel.callbackManager)
     )
     .with({ _tag: "InitializingEditor" }, () => sub.none)
     .exhaustive();

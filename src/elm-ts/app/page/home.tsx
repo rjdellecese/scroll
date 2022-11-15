@@ -7,6 +7,7 @@ import type { Sub } from "elm-ts/lib/Sub";
 import { array, map, option, tuple } from "fp-ts";
 import { apply, constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
+import { Lens } from "monocle-ts";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
 import { match, P } from "ts-pattern";
@@ -14,6 +15,7 @@ import { match, P } from "ts-pattern";
 import type { API } from "~src/convex/_generated/api";
 import type { Document, Id } from "~src/convex/_generated/dataModel";
 import { useQuery } from "~src/convex/_generated/react";
+import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
 import * as logMessage from "~src/elm-ts/log-message";
@@ -23,9 +25,15 @@ import * as id from "~src/id";
 
 // MODEl
 
-export type Model =
-  | { _tag: "LoadingNotes" }
-  | { _tag: "LoadedNotes"; idsToNoteModels: Map<Id<"notes">, note.Model> };
+export type Model = LoadingNotesModel | LoadedNotesModel;
+
+type LoadingNotesModel = { _tag: "LoadingNotes" };
+
+type LoadedNotesModel = {
+  _tag: "LoadedNotes";
+  idsToNoteModels: Map<Id<"notes">, note.Model>;
+  haveAllInitialNotesLoaded: boolean;
+};
 
 export const init: Model = {
   _tag: "LoadingNotes",
@@ -79,15 +87,23 @@ export const update =
           tuple.mapFst((idsToNoteModels) => ({
             _tag: "LoadedNotes",
             idsToNoteModels,
+            haveAllInitialNotesLoaded: false,
           }))
         )
       )
       .with(
         [
-          { _tag: "GotNotesSince", idsToNotes: P.select("idsToNotes") },
-          { _tag: "LoadedNotes", idsToNoteModels: P.select("idsToNoteModels") },
+          {
+            _tag: "GotNotesSince",
+            idsToNotes: P.select("idsToNotes"),
+          },
+          {
+            _tag: "LoadedNotes",
+            idsToNoteModels: P.select("idsToNoteModels"),
+            haveAllInitialNotesLoaded: P.select("haveAllInitialNotesLoaded"),
+          },
         ],
-        ({ idsToNotes, idsToNoteModels }) =>
+        ({ idsToNotes, idsToNoteModels, haveAllInitialNotesLoaded }) =>
           pipe(
             idsToNotes,
             idsToNotesToIdsToNoteModels,
@@ -97,6 +113,7 @@ export const update =
                 id.getEq<"notes">(),
                 note.Magma
               )(idsToNoteModels_)(idsToNoteModels),
+              haveAllInitialNotesLoaded,
             }))
           )
       )
@@ -107,9 +124,13 @@ export const update =
             noteId: P.select("noteId"),
             msg: P.select("noteMsg"),
           },
-          { _tag: "LoadedNotes", idsToNoteModels: P.select("idsToNoteModels") },
+          {
+            _tag: "LoadedNotes",
+            idsToNoteModels: P.select("idsToNoteModels"),
+            haveAllInitialNotesLoaded: P.select("haveAllInitialNotesLoaded"),
+          },
         ],
-        ({ noteId, noteMsg, idsToNoteModels }) =>
+        ({ noteId, noteMsg, idsToNoteModels, haveAllInitialNotesLoaded }) =>
           pipe(
             idsToNoteModels,
             map.lookup(id.getEq<"notes">())(noteId),
@@ -118,20 +139,40 @@ export const update =
                 note.update(stage, convex)(noteMsg, noteModel),
                 tuple.bimap(
                   cmd.map(
-                    (editorMsg_): Msg => ({
+                    (noteMsg_): Msg => ({
                       _tag: "GotNoteMsg",
                       noteId,
-                      msg: editorMsg_,
+                      msg: noteMsg_,
                     })
                   ),
-                  (noteModel_): Model => ({
+                  (noteModel_): LoadedNotesModel => ({
                     _tag: "LoadedNotes",
                     idsToNoteModels: map.upsertAt(id.getEq<"notes">())(
                       noteId,
                       noteModel_
                     )(idsToNoteModels),
+                    haveAllInitialNotesLoaded,
                   })
-                )
+                ),
+                ([loadedNotesModel, cmd_]) =>
+                  match<boolean, [Model, Cmd<Msg>]>(
+                    loadedNotesModel.haveAllInitialNotesLoaded
+                  )
+                    .with(true, () => [loadedNotesModel, cmd_])
+                    .with(false, () =>
+                      match<boolean, [Model, Cmd<Msg>]>(
+                        areAllNotesLoaded(loadedNotesModel.idsToNoteModels)
+                      )
+                        .with(true, () => [
+                          Lens.fromProp<LoadedNotesModel>()(
+                            "haveAllInitialNotesLoaded"
+                          ).set(true)(loadedNotesModel),
+                          cmd.batch([cmd_, scrollToBottomCmd]),
+                        ])
+                        .with(false, () => [loadedNotesModel, cmd_])
+                        .exhaustive()
+                    )
+                    .exhaustive()
               )
             ),
             option.match(() => [model, cmd.none], identity)
@@ -198,6 +239,22 @@ const idsToNotesToIdsToNoteModels = (
     ),
     ({ idsToNoteModels, cmds }) => [idsToNoteModels, cmd.batch(cmds)]
   );
+
+const areAllNotesLoaded = (idsToNoteModels: Map<Id<"notes">, note.Model>) =>
+  pipe(
+    idsToNoteModels,
+    map.values(note.Ord),
+    array.every((noteModel) => note.isLoaded(noteModel))
+  );
+
+const scrollToBottomCmd: Cmd<never> = pipe(
+  cmdExtra.fromIOVoid(() =>
+    window.scrollTo({
+      top: document.body.scrollHeight,
+    })
+  ),
+  cmdExtra.scheduleForNextAnimationFrame
+);
 
 // VIEW
 

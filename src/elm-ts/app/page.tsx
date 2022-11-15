@@ -1,4 +1,4 @@
-import { UserButton, UserProfile } from "@clerk/clerk-react";
+import { UserButton } from "@clerk/clerk-react";
 import type { ConvexReactClient } from "convex/react";
 import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
@@ -15,7 +15,6 @@ import * as home from "~src/elm-ts/app/page/home";
 import type { Route } from "~src/elm-ts/route";
 import * as route from "~src/elm-ts/route";
 import type { Stage } from "~src/elm-ts/stage";
-import { appearance } from "../clerk-appearance";
 
 // MODEL
 
