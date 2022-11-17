@@ -4,11 +4,9 @@ import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import { array, either, map, option, tuple } from "fp-ts";
+import { array, map, option, tuple } from "fp-ts";
 import { apply, constVoid, flow, identity, pipe } from "fp-ts/function";
-import type { Either } from "fp-ts/lib/Either";
 import type { IO } from "fp-ts/lib/IO";
-import type { Option } from "fp-ts/lib/Option";
 import { Lens } from "monocle-ts";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
@@ -20,7 +18,6 @@ import { useQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
-import type { LogMessage } from "~src/elm-ts/log-message";
 import * as logMessage from "~src/elm-ts/log-message";
 import * as note from "~src/elm-ts/note";
 import type { Stage } from "~src/elm-ts/stage";
@@ -181,46 +178,6 @@ export const update =
         ),
       ]);
 
-const observeNoteEditors = (
-  idsToNoteModels: Map<Id<"notes">, note.Model>
-): Either<LogMessage, [MutationObserver, Cmd<never>]> =>
-  pipe(
-    either.Do,
-    either.bind("mutationObserver", () =>
-      either.right<LogMessage, MutationObserver>(new MutationObserver(() => {}))
-    ),
-    either.bind("noteElements", () =>
-      pipe(
-        idsToNoteModels,
-        map.values(note.Ord),
-        array.map(
-          flow(
-            note.editorId,
-            either.fromOption(() =>
-              logMessage.error("Failed to get editor ID from note model")
-            ),
-            either.chain((editorId) =>
-              either.fromNullable<LogMessage>(
-                logMessage.error(
-                  `Failed to find element by HTML ID ${editorId}`
-                )
-              )(document.getElementById(editorId))
-            )
-          )
-        ),
-        either.sequenceArray
-      )
-    ),
-    either.map(({ mutationObserver, noteElements }) => [
-      mutationObserver,
-      cmdExtra.fromIOVoid(() =>
-        noteElements.forEach((noteElement) =>
-          mutationObserver.observe(noteElement, { childList: true })
-        )
-      ),
-    ])
-  );
-
 const idsToNotesToIdsToNoteModels = (
   idsToNotes: Map<
     Id<"notes">,
@@ -284,12 +241,14 @@ const areAllNotesLoaded = (idsToNoteModels: Map<Id<"notes">, note.Model>) =>
   );
 
 const scrollToBottom: Cmd<never> = pipe(
-  cmdExtra.fromIOVoid(() => {
-    console.log("scroll to bottom");
-    window.scrollTo({
-      top: document.body.scrollHeight,
-    });
-  }),
+  cmdExtra.fromIOVoid(() =>
+    // I haven't been able to figure out why, but we need to wait one more animation frame here to ensure that everything is rendered before we try to scroll to the bottom.
+    requestAnimationFrame(() =>
+      window.scrollTo({
+        top: document.body.scrollHeight,
+      })
+    )
+  ),
   cmdExtra.scheduleForNextAnimationFrame
 );
 

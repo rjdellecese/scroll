@@ -7,7 +7,7 @@ import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import type { magma } from "fp-ts";
 import { io, nonEmptyArray, number, option, readonlyArray, tuple } from "fp-ts";
-import { constVoid, flow, pipe } from "fp-ts/function";
+import { constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
 import type * as ord from "fp-ts/lib/Ord";
@@ -54,7 +54,7 @@ type InitializedNoteModel = {
   clientId: string;
   editor: TiptapEditor;
   callbackManager: CallbackManager<Msg>;
-  hasEditorMounted: boolean;
+  isEditorReady: boolean;
   areStepsInFlight: boolean;
 };
 
@@ -102,10 +102,7 @@ export const init = ({
 
 export const hasLoaded = (model: Model): boolean =>
   match(model)
-    .with(
-      { _tag: "InitializedNote", hasEditorMounted: P.select() },
-      (hasEditorMounted) => hasEditorMounted
-    )
+    .with({ _tag: "InitializedNote", isEditorReady: P.select() }, identity)
     .with({ _tag: "InitializingNote" }, () => false)
     .exhaustive();
 
@@ -125,6 +122,7 @@ type InitializingNoteMsg =
   | { _tag: "GeneratedClientId"; clientId: string };
 
 type InitializedNoteMsg =
+  | { _tag: "EditorWasCreated" }
   | { _tag: "EditorTransactionApplied" }
   | { _tag: "StepsSent" }
   | {
@@ -181,7 +179,7 @@ export const update =
                       clientId,
                       editor,
                       callbackManager,
-                      hasEditorMounted: false,
+                      isEditorReady: false,
                       areStepsInFlight: false,
                     },
                     cmd.none,
@@ -212,48 +210,38 @@ export const update =
               InitializedNoteMsg,
               [InitializedNoteModel, Cmd<InitializedNoteMsg>]
             >(initializedNoteMsg)
-              .with({ _tag: "EditorTransactionApplied" }, () => {
-                const editorHasMounted = (
-                  initializedNoteModel: InitializedNoteModel
-                ): InitializedNoteModel =>
-                  match(initializedNoteModel.hasEditorMounted)
-                    .with(true, () => initializedNoteModel)
-                    .with(false, () =>
-                      Lens.fromProp<InitializedNoteModel>()(
-                        "hasEditorMounted"
-                      ).set(true)(initializedNoteModel)
-                    )
-                    .exhaustive();
-
-                return pipe(
-                  match<
-                    boolean,
-                    [InitializedNoteModel, Cmd<InitializedNoteMsg>]
-                  >(initializedNoteModel.areStepsInFlight)
-                    .with(true, () => [initializedNoteModel, cmd.none])
-                    .with(false, () =>
-                      match<
-                        ReturnType<typeof collab.sendableSteps>,
-                        [InitializedNoteModel, Cmd<InitializedNoteMsg>]
-                      >(collab.sendableSteps(initializedNoteModel.editor.state))
-                        .with(null, () => [initializedNoteModel, cmd.none])
-                        .with(P.not(null), ({ version, steps }) => [
-                          Lens.fromProp<InitializedNoteModel>()(
-                            "areStepsInFlight"
-                          ).set(true)(initializedNoteModel),
-                          sendStepsCmd(
-                            convex,
-                            initializedNoteModel,
-                            version,
-                            steps
-                          ),
-                        ])
-                        .exhaustive()
-                    )
-                    .exhaustive(),
-                  tuple.mapFst(editorHasMounted)
-                );
-              })
+              .with({ _tag: "EditorWasCreated" }, () => [
+                Lens.fromProp<InitializedNoteModel>()("isEditorReady").set(
+                  true
+                )(initializedNoteModel),
+                cmd.none,
+              ])
+              .with({ _tag: "EditorTransactionApplied" }, () =>
+                match<boolean, [InitializedNoteModel, Cmd<InitializedNoteMsg>]>(
+                  initializedNoteModel.areStepsInFlight
+                )
+                  .with(true, () => [initializedNoteModel, cmd.none])
+                  .with(false, () =>
+                    match<
+                      ReturnType<typeof collab.sendableSteps>,
+                      [InitializedNoteModel, Cmd<InitializedNoteMsg>]
+                    >(collab.sendableSteps(initializedNoteModel.editor.state))
+                      .with(null, () => [initializedNoteModel, cmd.none])
+                      .with(P.not(null), ({ version, steps }) => [
+                        Lens.fromProp<InitializedNoteModel>()(
+                          "areStepsInFlight"
+                        ).set(true)(initializedNoteModel),
+                        sendStepsCmd(
+                          convex,
+                          initializedNoteModel,
+                          version,
+                          steps
+                        ),
+                      ])
+                      .exhaustive()
+                  )
+                  .exhaustive()
+              )
               .with({ _tag: "StepsSent" }, () =>
                 match<
                   ReturnType<typeof collab.sendableSteps>,
@@ -380,7 +368,7 @@ const initializeEditorCmd = ({
   version: number;
 }): Cmd<InitializingNoteMsg> =>
   pipe(
-    () => document.getElementById(editorId_(clientId)),
+    () => document.getElementById(editorId(clientId)),
     cmdExtra.fromIO,
     cmdExtra.chain(
       flow(
@@ -417,6 +405,12 @@ const initializeEditorCmd = ({
                     ],
                   }),
                 ],
+                onCreate: () => {
+                  callbackInterop.dispatch({
+                    _tag: "GotInitializedNoteMsg",
+                    msg: { _tag: "EditorWasCreated" },
+                  })();
+                },
                 onTransaction: () => {
                   callbackInterop.dispatch({
                     _tag: "GotInitializedNoteMsg",
@@ -434,8 +428,7 @@ const initializeEditorCmd = ({
             }, cmdExtra.fromIO)
         )
       )
-    ),
-    cmdExtra.scheduleForNextAnimationFrame
+    )
   );
 
 const sendStepsCmd = (
@@ -533,19 +526,11 @@ const Editor = ({
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div id={editorId_(clientId)} className="flex-grow" />;
+  return <div id={editorId(clientId)} className="flex-grow" />;
 };
 
 // TODO: newtype `EditorId`
-const editorId_ = (clientId: string): string => `editor-${clientId}`;
-
-export const editorId = (model: Model): Option<string> =>
-  match(model)
-    .with({ _tag: "InitializingNote" }, () => option.none)
-    .with({ _tag: "InitializedNote", clientId: P.select() }, (clientId) =>
-      option.some(editorId_(clientId))
-    )
-    .exhaustive();
+const editorId = (clientId: string): string => `editor-${clientId}`;
 
 // SUBSCRIPTIONS
 
