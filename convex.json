@@ -7,10 +7,6 @@
     {
       "domain": "https://clerk.concise.escargot-18.lcl.dev/",
       "applicationID": "convex"
-    },
-    {
-      "domain": "clerk.scroll.ink",
-      "applicationID": "convex"
     }
   ]
 }
