@@ -242,7 +242,7 @@ const areAllNotesLoaded = (idsToNoteModels: Map<Id<"notes">, note.Model>) =>
 
 const scrollToBottom: Cmd<never> = pipe(
   cmdExtra.fromIOVoid(() =>
-    // I haven't been able to figure out why, but we need to wait one more animation frame here to ensure that everything is rendered before we try to scroll to the bottom.
+    // I haven't been able to figure out why, but we need to wait one more animation frame here to ensure that everything is rendered before we try to scroll to the bottom. This works, but isn't ideal.
     requestAnimationFrame(() =>
       window.scrollTo({
         top: document.body.scrollHeight,
@@ -296,15 +296,14 @@ const LoadingNotes = ({
       pipe(
         notes,
         option.match(
-          () => constVoid,
-          (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
-            () =>
-              dispatch({
-                _tag: "GotNotes",
-                idsToNotes,
-              })
+          constVoid,
+          (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): void =>
+            dispatch({
+              _tag: "GotNotes",
+              idsToNotes,
+            })
         )
-      )(),
+      ),
     [notes, dispatch]
   );
 
@@ -327,20 +326,18 @@ const LoadedNotes = ({
   React.useEffect(
     () =>
       option.match(
-        () => constVoid,
-        (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
+        constVoid,
+        (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): void =>
           match(map.isEmpty(idsToNotes))
-            .with(
-              false,
-              () => () =>
-                dispatch({
-                  _tag: "GotNotesSince",
-                  idsToNotes,
-                })
+            .with(false, () =>
+              dispatch({
+                _tag: "GotNotesSince",
+                idsToNotes,
+              })
             )
-            .with(true, () => constVoid)
+            .with(true, constVoid)
             .exhaustive()
-      )(notesSince)(),
+      )(notesSince),
     [notesSince, dispatch]
   );
 

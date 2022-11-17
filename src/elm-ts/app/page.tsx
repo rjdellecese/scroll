@@ -111,7 +111,7 @@ const layoutView =
         <div className="sticky top-0 h-12 z-50 px-4 py-2 flex flex-row content-center justify-end border-b-2 border-b-stone-300 bg-stone-50">
           <UserButton appearance={{ elements: { rootBox: "self-center" } }} />
         </div>
-        <div className="mt-4 mb-8 mx-2">{page(dispatch)}</div>
+        <div className="mt-8 mb-16 mx-4">{page(dispatch)}</div>
       </div>
     );
 
