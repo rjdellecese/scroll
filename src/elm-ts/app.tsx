@@ -9,10 +9,11 @@ import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { tuple } from "fp-ts";
 import { apply, constVoid, pipe } from "fp-ts/lib/function";
-import type { Dispatch, ReactElement, ReactNode } from "react";
+import type { Dispatch, ReactNode } from "react";
 import React, { useEffect, useState } from "react";
 import { match, P } from "ts-pattern";
 
+import * as clerkFrontendApiKey from "~src/clerk-frontend-api-key";
 import type { API } from "~src/convex/_generated/api";
 import clientConfig from "~src/convex/_generated/clientConfig";
 import * as page from "~src/elm-ts/app/page";
@@ -125,16 +126,6 @@ const ConvexProviderWithClerk = ({
       </ClerkLayout>
     );
   }
-  // TODO
-  // } else if (!isSignedIn) {
-  //   return (
-  //     loggedOut || (
-  //       <ClerkWrapper>
-  //         <SignIn />
-  //       </ClerkWrapper>
-  //     )
-  //   );
-  // }
 
   return <ConvexProvider client={convexClient}>{children}</ConvexProvider>;
 };
@@ -142,7 +133,7 @@ const ConvexProviderWithClerk = ({
 export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
   (
     <ClerkProvider
-      frontendApi="clerk.concise.escargot-18.lcl.dev"
+      frontendApi={clerkFrontendApiKey.fromStage(model.stage)}
       appearance={appearance}
     >
       <ConvexProviderWithClerk
