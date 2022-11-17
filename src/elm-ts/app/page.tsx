@@ -12,6 +12,8 @@ import { match, P } from "ts-pattern";
 
 import type { API } from "~src/convex/_generated/api";
 import * as home from "~src/elm-ts/app/page/home";
+import * as signIn from "~src/elm-ts/app/page/sign-in";
+import * as signUp from "~src/elm-ts/app/page/sign-up";
 import type { Route } from "~src/elm-ts/route";
 import * as route from "~src/elm-ts/route";
 import type { Stage } from "~src/elm-ts/stage";
@@ -23,6 +25,8 @@ export type Model =
       _tag: "Home";
       model: home.Model;
     }
+  | { _tag: "SignIn" }
+  | { _tag: "SignUp" }
   | { _tag: "NotFound" };
 
 export const locationToMsg = (location: Location): Msg => ({
@@ -39,6 +43,8 @@ const routeToModelCmd = (route: Route): [Model, Cmd<Msg>] =>
       },
       cmd.none,
     ])
+    .with({ _tag: "SignIn" }, () => [{ _tag: "SignIn" }, cmd.none])
+    .with({ _tag: "SignUp" }, () => [{ _tag: "SignUp" }, cmd.none])
     .with({ _tag: "NotFound" }, () => [{ _tag: "NotFound" }, cmd.none])
     .exhaustive();
 
@@ -92,7 +98,9 @@ export const view = (model: Model): Html<Msg> =>
         layoutView
       )
     )
-    .with({ _tag: "NotFound" }, () => layoutView(notFoundView))
+    .with({ _tag: "SignIn" }, () => signIn.view)
+    .with({ _tag: "SignUp" }, () => signUp.view)
+    .with({ _tag: "NotFound" }, () => notFoundView)
     .exhaustive();
 
 const layoutView =
@@ -126,5 +134,7 @@ export const subscriptions: (model: Model) => Sub<Msg> = (
           sub.map((homeMsg) => ({ _tag: "GotHomeMsg", msg: homeMsg }))
         )
     )
+    .with({ _tag: "SignIn" }, () => sub.none)
+    .with({ _tag: "SignUp" }, () => sub.none)
     .with({ _tag: "NotFound" }, () => sub.none)
     .exhaustive();

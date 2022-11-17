@@ -4,9 +4,11 @@ import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import { array, map, option, tuple } from "fp-ts";
+import { array, either, map, option, tuple } from "fp-ts";
 import { apply, constVoid, flow, identity, pipe } from "fp-ts/function";
+import type { Either } from "fp-ts/lib/Either";
 import type { IO } from "fp-ts/lib/IO";
+import type { Option } from "fp-ts/lib/Option";
 import { Lens } from "monocle-ts";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
@@ -18,6 +20,7 @@ import { useQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
+import type { LogMessage } from "~src/elm-ts/log-message";
 import * as logMessage from "~src/elm-ts/log-message";
 import * as note from "~src/elm-ts/note";
 import type { Stage } from "~src/elm-ts/stage";
@@ -87,6 +90,7 @@ export const update =
           tuple.mapFst((idsToNoteModels) => ({
             _tag: "LoadedNotes",
             idsToNoteModels,
+            optionLoadedNotesMutationObserver: option.none,
             haveAllInitialNotesLoaded: false,
           }))
         )
@@ -97,24 +101,22 @@ export const update =
             _tag: "GotNotesSince",
             idsToNotes: P.select("idsToNotes"),
           },
-          {
+          P.select("loadedNotesModel", {
             _tag: "LoadedNotes",
-            idsToNoteModels: P.select("idsToNoteModels"),
-            haveAllInitialNotesLoaded: P.select("haveAllInitialNotesLoaded"),
-          },
+          }),
         ],
-        ({ idsToNotes, idsToNoteModels, haveAllInitialNotesLoaded }) =>
+        ({ idsToNotes, loadedNotesModel }) =>
           pipe(
             idsToNotes,
             idsToNotesToIdsToNoteModels,
-            tuple.mapFst((idsToNoteModels_) => ({
-              _tag: "LoadedNotes",
-              idsToNoteModels: map.union(
-                id.getEq<"notes">(),
-                note.Magma
-              )(idsToNoteModels_)(idsToNoteModels),
-              haveAllInitialNotesLoaded,
-            }))
+            tuple.mapFst((idsToNoteModels) =>
+              Lens.fromProp<LoadedNotesModel>()("idsToNoteModels").modify(
+                (idsToNoteModels_) =>
+                  map.union(id.getEq<"notes">(), note.Magma)(idsToNoteModels_)(
+                    idsToNoteModels
+                  )
+              )(loadedNotesModel)
+            )
           )
       )
       .with(
@@ -124,15 +126,13 @@ export const update =
             noteId: P.select("noteId"),
             msg: P.select("noteMsg"),
           },
-          {
+          P.select("loadedNotesModel", {
             _tag: "LoadedNotes",
-            idsToNoteModels: P.select("idsToNoteModels"),
-            haveAllInitialNotesLoaded: P.select("haveAllInitialNotesLoaded"),
-          },
+          }),
         ],
-        ({ noteId, noteMsg, idsToNoteModels, haveAllInitialNotesLoaded }) =>
+        ({ noteId, noteMsg, loadedNotesModel }) =>
           pipe(
-            idsToNoteModels,
+            loadedNotesModel.idsToNoteModels,
             map.lookup(id.getEq<"notes">())(noteId),
             option.map((noteModel) =>
               pipe(
@@ -145,14 +145,10 @@ export const update =
                       msg: noteMsg_,
                     })
                   ),
-                  (noteModel_): LoadedNotesModel => ({
-                    _tag: "LoadedNotes",
-                    idsToNoteModels: map.upsertAt(id.getEq<"notes">())(
-                      noteId,
-                      noteModel_
-                    )(idsToNoteModels),
-                    haveAllInitialNotesLoaded,
-                  })
+                  (noteModel): LoadedNotesModel =>
+                    Lens.fromProp<LoadedNotesModel>()("idsToNoteModels").modify(
+                      map.upsertAt(id.getEq<"notes">())(noteId, noteModel)
+                    )(loadedNotesModel)
                 ),
                 ([loadedNotesModel, cmd_]) =>
                   match<boolean, [Model, Cmd<Msg>]>(
@@ -167,7 +163,7 @@ export const update =
                           Lens.fromProp<LoadedNotesModel>()(
                             "haveAllInitialNotesLoaded"
                           ).set(true)(loadedNotesModel),
-                          cmd.batch([cmd_, scrollToBottomCmd]),
+                          cmd.batch([cmd_, scrollToBottom]),
                         ])
                         .with(false, () => [loadedNotesModel, cmd_])
                         .exhaustive()
@@ -184,6 +180,46 @@ export const update =
           logMessage.error("Failed to match model with msg", { model, msg })
         ),
       ]);
+
+const observeNoteEditors = (
+  idsToNoteModels: Map<Id<"notes">, note.Model>
+): Either<LogMessage, [MutationObserver, Cmd<never>]> =>
+  pipe(
+    either.Do,
+    either.bind("mutationObserver", () =>
+      either.right<LogMessage, MutationObserver>(new MutationObserver(() => {}))
+    ),
+    either.bind("noteElements", () =>
+      pipe(
+        idsToNoteModels,
+        map.values(note.Ord),
+        array.map(
+          flow(
+            note.editorId,
+            either.fromOption(() =>
+              logMessage.error("Failed to get editor ID from note model")
+            ),
+            either.chain((editorId) =>
+              either.fromNullable<LogMessage>(
+                logMessage.error(
+                  `Failed to find element by HTML ID ${editorId}`
+                )
+              )(document.getElementById(editorId))
+            )
+          )
+        ),
+        either.sequenceArray
+      )
+    ),
+    either.map(({ mutationObserver, noteElements }) => [
+      mutationObserver,
+      cmdExtra.fromIOVoid(() =>
+        noteElements.forEach((noteElement) =>
+          mutationObserver.observe(noteElement, { childList: true })
+        )
+      ),
+    ])
+  );
 
 const idsToNotesToIdsToNoteModels = (
   idsToNotes: Map<
@@ -244,15 +280,16 @@ const areAllNotesLoaded = (idsToNoteModels: Map<Id<"notes">, note.Model>) =>
   pipe(
     idsToNoteModels,
     map.values(note.Ord),
-    array.every((noteModel) => note.isLoaded(noteModel))
+    array.every((noteModel) => note.hasLoaded(noteModel))
   );
 
-const scrollToBottomCmd: Cmd<never> = pipe(
-  cmdExtra.fromIOVoid(() =>
+const scrollToBottom: Cmd<never> = pipe(
+  cmdExtra.fromIOVoid(() => {
+    console.log("scroll to bottom");
     window.scrollTo({
       top: document.body.scrollHeight,
-    })
-  ),
+    });
+  }),
   cmdExtra.scheduleForNextAnimationFrame
 );
 
@@ -312,11 +349,7 @@ const LoadingNotes = ({
     [notes, dispatch]
   );
 
-  return (
-    <div className="grid h-screen items-center justify-center">
-      <LoadingSpinner />
-    </div>
-  );
+  return <LoadingSpinner />;
 };
 
 const LoadedNotes = ({
@@ -334,24 +367,21 @@ const LoadedNotes = ({
 
   React.useEffect(
     () =>
-      pipe(
-        notesSince,
-        option.match(
-          () => constVoid,
-          (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
-            match(map.isEmpty(idsToNotes))
-              .with(
-                false,
-                () => () =>
-                  dispatch({
-                    _tag: "GotNotesSince",
-                    idsToNotes,
-                  })
-              )
-              .with(true, () => constVoid)
-              .exhaustive()
-        )
-      )(),
+      option.match(
+        () => constVoid,
+        (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
+          match(map.isEmpty(idsToNotes))
+            .with(
+              false,
+              () => () =>
+                dispatch({
+                  _tag: "GotNotesSince",
+                  idsToNotes,
+                })
+            )
+            .with(true, () => constVoid)
+            .exhaustive()
+      )(notesSince)(),
     [notesSince, dispatch]
   );
 
@@ -387,18 +417,21 @@ const NoNotes = ({ dispatch }: { dispatch: Dispatch<Msg> }): ReactElement => {
 
   React.useEffect(
     () =>
-      pipe(
-        notes,
-        option.match(
-          () => constVoid,
-          (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
-            () =>
-              dispatch({
-                _tag: "GotNotes",
-                idsToNotes,
-              })
-        )
-      )(),
+      option.match(
+        () => constVoid,
+        (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
+          match(map.isEmpty(idsToNotes))
+            .with(
+              false,
+              () => () =>
+                dispatch({
+                  _tag: "GotNotes",
+                  idsToNotes,
+                })
+            )
+            .with(true, () => constVoid)
+            .exhaustive()
+      )(notes)(),
     [notes, dispatch]
   );
 

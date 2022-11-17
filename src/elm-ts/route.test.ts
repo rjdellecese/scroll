@@ -2,37 +2,90 @@ import { describe, expect, test } from "@jest/globals";
 import type { Arbitrary } from "fast-check";
 import * as fc from "fast-check";
 import { array, string } from "fp-ts";
+import { pipe } from "fp-ts/lib/function";
 
+import type { NotFound, Route } from "~src/elm-ts/route";
 import { fromLocationPathname } from "~src/elm-ts/route";
+import * as route from "~src/elm-ts/route";
 
 describe("router", () => {
-  test('parses "" or "/" as the home route', () => {
+  test("parses the home route", () => {
     fc.assert(
       fc.property(homePathArbitrary(), (pathname: string) => {
-        expect(fromLocationPathname(pathname)).toEqual({ _tag: "Home" });
+        expect(route.fromLocationPathname(pathname)).toEqual({ _tag: "Home" });
+      })
+    );
+  });
+  test("parses the sign in route", () => {
+    fc.assert(
+      fc.property(signInPathArbitrary(), (pathname: string) => {
+        expect(route.fromLocationPathname(pathname)).toEqual({
+          _tag: "SignIn",
+        });
+      })
+    );
+  });
+  test("parses the sign up route", () => {
+    fc.assert(
+      fc.property(signUpPathArbitrary(), (pathname: string) => {
+        expect(route.fromLocationPathname(pathname)).toEqual({
+          _tag: "SignUp",
+        });
       })
     );
   });
   test("parses any other path as the not found route", () => {
     fc.assert(
       fc.property(notFoundPathArbitrary(), (pathname: string) => {
-        expect(fromLocationPathname(pathname)).toEqual({ _tag: "NotFound" });
+        expect(route.fromLocationPathname(pathname)).toEqual({
+          _tag: "NotFound",
+        });
       })
+    );
+  });
+  test("fromLocationPathname is the left inverse of toString", () => {
+    fc.assert(
+      fc.property(
+        routeLessNotFoundArbitrary(),
+        (route_: Exclude<Route, NotFound>) => {
+          expect(
+            pipe(route_, route.toString, route.fromLocationPathname)
+          ).toEqual(route_);
+        }
+      )
     );
   });
 });
 
-const homePaths: ["", "/"] = ["", "/"];
+const routeLessNotFoundArbitrary: () => Arbitrary<
+  Exclude<Route, NotFound>
+> = () =>
+  fc.oneof(
+    fc.constant(route.home),
+    fc.constant(route.signIn),
+    fc.constant(route.signUp)
+  );
 
+const homePaths: ["", "/"] = ["", "/"];
 const homePathArbitrary: () => Arbitrary<string> = () =>
   fc.oneof(...array.map(fc.constant)(homePaths));
+
+const signInPath: "sign-in" = "sign-in";
+const signInPathArbitrary: () => Arbitrary<string> = () =>
+  fc.constant(signInPath);
+
+const signUpPath: "sign-up" = "sign-up";
+const signUpPathArbitrary: () => Arbitrary<string> = () =>
+  fc.constant(signUpPath);
 
 const notFoundPathArbitrary: () => Arbitrary<string> = () =>
   fc
     .webPath()
     .filter(
       (webPath: string): boolean =>
-        !array.exists((homePath: string): boolean =>
-          string.Eq.equals(webPath, homePath)
-        )(homePaths)
+        !(
+          array.exists((homePath: string): boolean =>
+            string.Eq.equals(webPath, homePath)
+          )(homePaths) || string.Eq.equals(webPath, signInPath)
+        )
     );

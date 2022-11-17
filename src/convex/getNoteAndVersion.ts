@@ -4,17 +4,25 @@ import getNoteVersion from "./getNoteVersion";
 
 export default query(
   async (
-    { db },
+    { db, auth },
     noteId: Id<"notes">
   ): Promise<{ note: Document<"notes">; version: number }> => {
-    const note = await db.get(noteId);
+    const userIdentity = await auth.getUserIdentity();
 
-    if (note === null) {
-      throw "Failed to find note";
+    if (userIdentity) {
+      const note = await db.get(noteId);
+
+      if (note === null) {
+        throw "Failed to find note";
+      } else if (note.owner !== userIdentity.tokenIdentifier) {
+        throw "User doesn't own this note";
+      }
+
+      const version = await getNoteVersion(db, note._id);
+
+      return { note, version };
+    } else {
+      throw "Unauthenticated";
     }
-
-    const version = await getNoteVersion(db, note._id);
-
-    return { note, version };
   }
 );

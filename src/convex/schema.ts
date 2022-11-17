@@ -3,6 +3,7 @@ import { defineSchema, defineTable, s } from "convex/schema";
 export default defineSchema({
   notes: defineTable({
     proseMirrorDoc: s.string(),
+    owner: s.string(), // A `UserIdentity`'s `tokenIdentifier` (https://docs.convex.dev/api/interfaces/server.UserIdentity#tokenidentifier)
   }),
   steps: defineTable({
     noteId: s.id("notes"),

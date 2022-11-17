@@ -1,14 +1,15 @@
-import { ClerkProvider, RedirectToSignIn, useAuth } from "@clerk/clerk-react";
+import { ClerkProvider, useAuth } from "@clerk/clerk-react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProvider } from "convex/react";
 import { cmd, react as html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Location } from "elm-ts/lib/Navigation";
+import { push } from "elm-ts/lib/Navigation";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { tuple } from "fp-ts";
-import { apply, pipe } from "fp-ts/lib/function";
-import type { ReactElement, ReactNode } from "react";
+import { apply, constVoid, pipe } from "fp-ts/lib/function";
+import type { Dispatch, ReactElement, ReactNode } from "react";
 import React, { useEffect, useState } from "react";
 import { match, P } from "ts-pattern";
 
@@ -19,6 +20,8 @@ import { appearance } from "~src/elm-ts/clerk-appearance";
 import type { Flags } from "~src/elm-ts/flags";
 import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
 import type { Stage } from "~src/elm-ts/stage";
+
+import { ClerkLayout } from "./clerk-layout";
 
 // MODEL
 
@@ -50,7 +53,9 @@ export const locationToMsg = (location: Location): Msg => ({
 
 // UPDATE
 
-export type Msg = { _tag: "GotPageMsg"; msg: page.Msg };
+export type Msg =
+  | { _tag: "GotPageMsg"; msg: page.Msg }
+  | { _tag: "NotSignedIn" };
 
 export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
   match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
@@ -68,20 +73,21 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
           )
         )
     )
+    .with([{ _tag: "NotSignedIn" }, P.any], () => [model, push("/sign-in")])
     .exhaustive();
 
 // VIEW
 
 const ConvexProviderWithClerk = ({
   children,
+  dispatch,
+  pageModel,
   convexClient,
-  loading,
-  loggedOut,
 }: {
   children?: ReactNode;
+  dispatch: Dispatch<Msg>;
+  pageModel: page.Model;
   convexClient: ConvexReactClient<API>;
-  loading?: ReactElement;
-  loggedOut?: ReactElement;
 }) => {
   const { getToken, isSignedIn, isLoaded } = useAuth();
   const [clientAuthed, setClientAuthed] = useState(false);
@@ -95,39 +101,54 @@ const ConvexProviderWithClerk = ({
       }
     }
 
-    if (isSignedIn) {
-      const intervalId = setInterval(() => setAuth(), 50000);
-      setAuth();
-      return () => {
-        clearInterval(intervalId);
-      };
-    }
-  }, [convexClient, getToken, isSignedIn]);
+    match(isSignedIn)
+      .with(undefined, constVoid)
+      .with(true, () => {
+        const intervalId = setInterval(() => setAuth(), 50000);
+        setAuth();
+        return () => {
+          clearInterval(intervalId);
+        };
+      })
+      .with(false, () =>
+        match(pageModel._tag)
+          .with("SignIn", "SignUp", constVoid)
+          .otherwise(() => dispatch({ _tag: "NotSignedIn" }))
+      )
+      .exhaustive();
+  }, [convexClient, getToken, isSignedIn, pageModel, dispatch]);
 
   if (!isLoaded || (isSignedIn && !clientAuthed)) {
-    return loading || null;
-  } else if (!isSignedIn) {
-    return loggedOut || <RedirectToSignIn />;
+    return (
+      <ClerkLayout>
+        <LoadingSpinner />
+      </ClerkLayout>
+    );
   }
+  // TODO
+  // } else if (!isSignedIn) {
+  //   return (
+  //     loggedOut || (
+  //       <ClerkWrapper>
+  //         <SignIn />
+  //       </ClerkWrapper>
+  //     )
+  //   );
+  // }
 
   return <ConvexProvider client={convexClient}>{children}</ConvexProvider>;
 };
 
-export const view: (model: Model) => Html<Msg> = (model) => (dispatch) => {
-  const clerkClassNames = "self-center place-self-center justify-self-center";
-
-  return (
+export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
+  (
     <ClerkProvider
       frontendApi="clerk.concise.escargot-18.lcl.dev"
       appearance={appearance}
     >
       <ConvexProviderWithClerk
         convexClient={model.convex}
-        loading={
-          <div className="grid h-screen">
-            <LoadingSpinner className={clerkClassNames} />
-          </div>
-        }
+        pageModel={model.page}
+        dispatch={dispatch}
       >
         {pipe(
           model.page,
@@ -138,7 +159,6 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) => {
       </ConvexProviderWithClerk>
     </ClerkProvider>
   );
-};
 
 // SUBSCRIPTIONS
 
