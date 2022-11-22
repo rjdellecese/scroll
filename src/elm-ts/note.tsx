@@ -54,7 +54,6 @@ type InitializedNoteModel = {
   clientId: string;
   editor: TiptapEditor;
   callbackManager: CallbackManager<Msg>;
-  isEditorReady: boolean;
   areStepsInFlight: boolean;
 };
 
@@ -100,12 +99,6 @@ export const init = ({
   ),
 ];
 
-export const hasLoaded = (model: Model): boolean =>
-  match(model)
-    .with({ _tag: "InitializedNote", isEditorReady: P.select() }, identity)
-    .with({ _tag: "InitializingNote" }, () => false)
-    .exhaustive();
-
 // UPDATE
 
 export type Msg =
@@ -122,7 +115,6 @@ type InitializingNoteMsg =
   | { _tag: "GeneratedClientId"; clientId: string };
 
 type InitializedNoteMsg =
-  | { _tag: "EditorWasCreated" }
   | { _tag: "EditorTransactionApplied" }
   | { _tag: "StepsSent" }
   | {
@@ -179,7 +171,6 @@ export const update =
                       clientId,
                       editor,
                       callbackManager,
-                      isEditorReady: false,
                       areStepsInFlight: false,
                     },
                     cmd.none,
@@ -210,12 +201,6 @@ export const update =
               InitializedNoteMsg,
               [InitializedNoteModel, Cmd<InitializedNoteMsg>]
             >(initializedNoteMsg)
-              .with({ _tag: "EditorWasCreated" }, () => [
-                Lens.fromProp<InitializedNoteModel>()("isEditorReady").set(
-                  true
-                )(initializedNoteModel),
-                cmd.none,
-              ])
               .with({ _tag: "EditorTransactionApplied" }, () =>
                 match<boolean, [InitializedNoteModel, Cmd<InitializedNoteMsg>]>(
                   initializedNoteModel.areStepsInFlight
@@ -405,12 +390,6 @@ const initializeEditorCmd = ({
                     ],
                   }),
                 ],
-                onCreate: () => {
-                  callbackInterop.dispatch({
-                    _tag: "GotInitializedNoteMsg",
-                    msg: { _tag: "EditorWasCreated" },
-                  })();
-                },
                 onTransaction: () => {
                   callbackInterop.dispatch({
                     _tag: "GotInitializedNoteMsg",

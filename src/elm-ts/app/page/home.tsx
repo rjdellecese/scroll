@@ -32,7 +32,6 @@ type LoadingNotesModel = { _tag: "LoadingNotes" };
 type LoadedNotesModel = {
   _tag: "LoadedNotes";
   idsToNoteModels: Map<Id<"notes">, note.Model>;
-  haveAllInitialNotesLoaded: boolean;
 };
 
 export const init: Model = {
@@ -84,12 +83,13 @@ export const update =
         ],
         flow(
           idsToNotesToIdsToNoteModels,
-          tuple.mapFst((idsToNoteModels) => ({
-            _tag: "LoadedNotes",
-            idsToNoteModels,
-            optionLoadedNotesMutationObserver: option.none,
-            haveAllInitialNotesLoaded: false,
-          }))
+          tuple.bimap(
+            (cmd_) => cmd.batch([cmd_, scrollToBottom]),
+            (idsToNoteModels): LoadedNotesModel => ({
+              _tag: "LoadedNotes",
+              idsToNoteModels,
+            })
+          )
         )
       )
       .with(
@@ -131,6 +131,7 @@ export const update =
           pipe(
             loadedNotesModel.idsToNoteModels,
             map.lookup(id.getEq<"notes">())(noteId),
+            // TODO: Either with error, log
             option.map((noteModel) =>
               pipe(
                 note.update(stage, convex)(noteMsg, noteModel),
@@ -146,29 +147,13 @@ export const update =
                     Lens.fromProp<LoadedNotesModel>()("idsToNoteModels").modify(
                       map.upsertAt(id.getEq<"notes">())(noteId, noteModel)
                     )(loadedNotesModel)
-                ),
-                ([loadedNotesModel, cmd_]) =>
-                  match<boolean, [Model, Cmd<Msg>]>(
-                    loadedNotesModel.haveAllInitialNotesLoaded
-                  )
-                    .with(true, () => [loadedNotesModel, cmd_])
-                    .with(false, () =>
-                      match<boolean, [Model, Cmd<Msg>]>(
-                        areAllNotesLoaded(loadedNotesModel.idsToNoteModels)
-                      )
-                        .with(true, () => [
-                          Lens.fromProp<LoadedNotesModel>()(
-                            "haveAllInitialNotesLoaded"
-                          ).set(true)(loadedNotesModel),
-                          cmd.batch([cmd_, scrollToBottom]),
-                        ])
-                        .with(false, () => [loadedNotesModel, cmd_])
-                        .exhaustive()
-                    )
-                    .exhaustive()
+                )
               )
             ),
-            option.match(() => [model, cmd.none], identity)
+            option.match<
+              [LoadedNotesModel, Cmd<Msg>],
+              [LoadedNotesModel, Cmd<Msg>]
+            >(() => [loadedNotesModel, cmd.none], identity)
           )
       )
       .otherwise(() => [
@@ -233,21 +218,12 @@ const idsToNotesToIdsToNoteModels = (
     ({ idsToNoteModels, cmds }) => [idsToNoteModels, cmd.batch(cmds)]
   );
 
-const areAllNotesLoaded = (idsToNoteModels: Map<Id<"notes">, note.Model>) =>
-  pipe(
-    idsToNoteModels,
-    map.values(note.Ord),
-    array.every((noteModel) => note.hasLoaded(noteModel))
-  );
-
 const scrollToBottom: Cmd<never> = pipe(
   cmdExtra.fromIOVoid(() =>
     // I haven't been able to figure out why, but we need to wait one more animation frame here to ensure that everything is rendered before we try to scroll to the bottom. This works, but isn't ideal.
-    requestAnimationFrame(() =>
-      window.scrollTo({
-        top: document.body.scrollHeight,
-      })
-    )
+    window.scrollTo({
+      top: document.body.scrollHeight,
+    })
   ),
   cmdExtra.scheduleForNextAnimationFrame
 );

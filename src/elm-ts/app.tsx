@@ -8,7 +8,8 @@ import { push } from "elm-ts/lib/Navigation";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { tuple } from "fp-ts";
-import { apply, constVoid, pipe } from "fp-ts/lib/function";
+import { apply, constVoid, flow, pipe } from "fp-ts/lib/function";
+import { Lens } from "monocle-ts";
 import type { Dispatch, ReactNode } from "react";
 import React, { useEffect, useState } from "react";
 import { match, P } from "ts-pattern";
@@ -18,11 +19,11 @@ import type { API } from "~src/convex/_generated/api";
 import clientConfig from "~src/convex/_generated/clientConfig";
 import * as page from "~src/elm-ts/app/page";
 import { appearance } from "~src/elm-ts/clerk-appearance";
+import { ClerkLayout } from "~src/elm-ts/clerk-layout";
+import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import type { Flags } from "~src/elm-ts/flags";
 import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
 import type { Stage } from "~src/elm-ts/stage";
-
-import { ClerkLayout } from "./clerk-layout";
 
 // MODEL
 
@@ -30,6 +31,7 @@ type Model = {
   stage: Stage;
   convex: ConvexReactClient<API>;
   page: page.Model;
+  areFontsLoaded: boolean;
 };
 
 export const init: (
@@ -38,14 +40,28 @@ export const init: (
   pipe(
     page.init(location),
     tuple.bimap(
-      cmd.map((pageMsg) => ({ _tag: "GotPageMsg", msg: pageMsg })),
+      flow(
+        cmd.map((pageMsg): Msg => ({ _tag: "GotPageMsg", msg: pageMsg })),
+        (cmd_: Cmd<Msg>) => cmd.batch([cmd_, loadFontsAndNotifyWhenLoaded])
+      ),
       (pageModel) => ({
         stage: flags.stage,
         convex: new ConvexReactClient(clientConfig),
         page: pageModel,
+        areFontsLoaded: false,
       })
     )
   );
+
+// Prevent Flash Of Unstyled Text (FOUT), which can cause the scroll position to be wrong when it happens after notes have loaded and the page has been scrolled to the bottom.
+// Reference: https://dev.to/fyfirman/how-to-fix-fout-flash-of-unstyled-text-in-react-1dl1
+const loadFontsAndNotifyWhenLoaded: Cmd<Msg> = cmdExtra.fromTask(() =>
+  Promise.all([
+    document.fonts.load("16px MulishVariable"),
+    document.fonts.load("16px LoraVariable"),
+    document.fonts.load("16px JetBrains MonoVariable"),
+  ]).then((): Msg => ({ _tag: "FontsLoaded" }))
+);
 
 export const locationToMsg = (location: Location): Msg => ({
   _tag: "GotPageMsg",
@@ -56,6 +72,7 @@ export const locationToMsg = (location: Location): Msg => ({
 
 export type Msg =
   | { _tag: "GotPageMsg"; msg: page.Msg }
+  | { _tag: "FontsLoaded" }
   | { _tag: "NotSignedIn" };
 
 export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
@@ -74,6 +91,10 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
           )
         )
     )
+    .with([{ _tag: "FontsLoaded" }, P.any], () => [
+      Lens.fromProp<Model>()("areFontsLoaded").set(true)(model),
+      cmd.none,
+    ])
     .with([{ _tag: "NotSignedIn" }, P.any], () => [model, push("/sign-in")])
     .exhaustive();
 
@@ -82,13 +103,15 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
 const ConvexProviderWithClerk = ({
   children,
   dispatch,
-  pageModel,
   convexClient,
+  pageModel,
+  areFontsLoaded,
 }: {
   children?: ReactNode;
   dispatch: Dispatch<Msg>;
-  pageModel: page.Model;
   convexClient: ConvexReactClient<API>;
+  pageModel: page.Model;
+  areFontsLoaded: boolean;
 }) => {
   const { getToken, isSignedIn, isLoaded } = useAuth();
   const [clientAuthed, setClientAuthed] = useState(false);
@@ -119,7 +142,7 @@ const ConvexProviderWithClerk = ({
       .exhaustive();
   }, [convexClient, getToken, isSignedIn, pageModel, dispatch]);
 
-  if (!isLoaded || (isSignedIn && !clientAuthed)) {
+  if (!isLoaded || !areFontsLoaded || (isSignedIn && !clientAuthed)) {
     return (
       <ClerkLayout>
         <LoadingSpinner />
@@ -137,9 +160,10 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
       appearance={appearance}
     >
       <ConvexProviderWithClerk
+        dispatch={dispatch}
         convexClient={model.convex}
         pageModel={model.page}
-        dispatch={dispatch}
+        areFontsLoaded={model.areFontsLoaded}
       >
         {pipe(
           model.page,

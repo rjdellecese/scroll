@@ -8,6 +8,7 @@ import type { FromIO1 } from "fp-ts/FromIO";
 import { constant, flow, identity, pipe, untupled } from "fp-ts/function";
 import type { Functor1 } from "fp-ts/Functor";
 import type { IO } from "fp-ts/IO";
+import type { FromTask1 } from "fp-ts/lib/FromTask";
 import type { Monad1 } from "fp-ts/Monad";
 import type { Monoid } from "fp-ts/Monoid";
 import type { Option } from "fp-ts/Option";
@@ -58,6 +59,11 @@ export const chain: <A, B>(f: (a: A) => Cmd<B>) => (fa: Cmd<A>) => Cmd<B> =
 export const fromIO: FromIO1<URI>["fromIO"] = flow(
   observable.fromIO,
   observable.map(taskOption.of)
+);
+
+export const fromTask: FromTask1<URI>["fromTask"] = flow(
+  taskOption.fromTask,
+  observable.of
 );
 
 // TYPECLASS INSTANCES
@@ -111,6 +117,12 @@ export const Monad: Monad1<URI> = {
 export const FromIO: FromIO1<URI> = {
   URI: URI,
   fromIO: fromIO,
+};
+
+export const FromTask: FromTask1<URI> = {
+  URI: URI,
+  fromIO: fromIO,
+  fromTask: fromTask,
 };
 
 // COMBINATORS
