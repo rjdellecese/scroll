@@ -7,7 +7,7 @@ import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import type { magma } from "fp-ts";
 import { io, nonEmptyArray, number, option, readonlyArray, tuple } from "fp-ts";
-import { constVoid, flow, identity, pipe } from "fp-ts/function";
+import { constVoid, flow, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
 import type * as ord from "fp-ts/lib/Ord";
@@ -508,7 +508,6 @@ const Editor = ({
   return <div id={editorId(clientId)} className="flex-grow" />;
 };
 
-// TODO: newtype `EditorId`
 const editorId = (clientId: string): string => `editor-${clientId}`;
 
 // SUBSCRIPTIONS

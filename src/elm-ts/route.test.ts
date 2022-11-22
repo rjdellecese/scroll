@@ -5,7 +5,6 @@ import { array, string } from "fp-ts";
 import { pipe } from "fp-ts/lib/function";
 
 import type { NotFound, Route } from "~src/elm-ts/route";
-import { fromLocationPathname } from "~src/elm-ts/route";
 import * as route from "~src/elm-ts/route";
 
 describe("router", () => {

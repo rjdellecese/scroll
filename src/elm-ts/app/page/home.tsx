@@ -4,8 +4,8 @@ import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import { array, map, option, tuple } from "fp-ts";
-import { apply, constVoid, flow, identity, pipe } from "fp-ts/function";
+import { array, either, map, option, tuple } from "fp-ts";
+import { apply, constVoid, flow, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
 import { Lens } from "monocle-ts";
 import type { Dispatch, ReactElement } from "react";
@@ -18,6 +18,7 @@ import { useQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
+import type { LogMessage } from "~src/elm-ts/log-message";
 import * as logMessage from "~src/elm-ts/log-message";
 import * as note from "~src/elm-ts/note";
 import type { Stage } from "~src/elm-ts/stage";
@@ -131,29 +132,34 @@ export const update =
           pipe(
             loadedNotesModel.idsToNoteModels,
             map.lookup(id.getEq<"notes">())(noteId),
-            // TODO: Either with error, log
-            option.map((noteModel) =>
-              pipe(
-                note.update(stage, convex)(noteMsg, noteModel),
-                tuple.bimap(
-                  cmd.map(
-                    (noteMsg_): Msg => ({
-                      _tag: "GotNoteMsg",
-                      noteId,
-                      msg: noteMsg_,
-                    })
-                  ),
-                  (noteModel): LoadedNotesModel =>
-                    Lens.fromProp<LoadedNotesModel>()("idsToNoteModels").modify(
-                      map.upsertAt(id.getEq<"notes">())(noteId, noteModel)
-                    )(loadedNotesModel)
-                )
-              )
+            either.fromOption(() =>
+              logMessage.error("Failed to find note by ID")
             ),
-            option.match<
-              [LoadedNotesModel, Cmd<Msg>],
-              [LoadedNotesModel, Cmd<Msg>]
-            >(() => [loadedNotesModel, cmd.none], identity)
+            either.match(
+              (logMessage_: LogMessage) => [
+                loadedNotesModel,
+                logMessage.report(stage)(logMessage_),
+              ],
+              (noteModel) =>
+                pipe(
+                  note.update(stage, convex)(noteMsg, noteModel),
+                  tuple.bimap(
+                    cmd.map(
+                      (noteMsg_): Msg => ({
+                        _tag: "GotNoteMsg",
+                        noteId,
+                        msg: noteMsg_,
+                      })
+                    ),
+                    (noteModel): LoadedNotesModel =>
+                      Lens.fromProp<LoadedNotesModel>()(
+                        "idsToNoteModels"
+                      ).modify(
+                        map.upsertAt(id.getEq<"notes">())(noteId, noteModel)
+                      )(loadedNotesModel)
+                  )
+                )
+            )
           )
       )
       .otherwise(() => [

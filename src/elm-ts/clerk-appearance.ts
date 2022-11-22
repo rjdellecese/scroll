@@ -2,10 +2,10 @@ import resolveConfig from "tailwindcss/resolveConfig";
 import type { Config } from "tailwindcss/types/config";
 import type { DefaultColors } from "tailwindcss/types/generated/colors";
 
-// TODO
 // @ts-ignore
 import tailwindConfig from "~tailwind.config.js";
 
+// eslint-disable-next-line no-type-assertion/no-type-assertion
 const resolvedTailwindConfig = resolveConfig(tailwindConfig) as Config & {
   theme: { colors: DefaultColors };
 };
