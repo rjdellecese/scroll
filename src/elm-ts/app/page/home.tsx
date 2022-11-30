@@ -107,13 +107,20 @@ export const update =
           pipe(
             idsToNotes,
             idsToNotesToIdsToNoteModels,
-            tuple.mapFst((idsToNoteModels) =>
-              Lens.fromProp<LoadedNotesModel>()("idsToNoteModels").modify(
-                (idsToNoteModels_) =>
-                  map.union(id.getEq<"notes">(), note.Magma)(idsToNoteModels_)(
-                    idsToNoteModels
-                  )
-              )(loadedNotesModel)
+            tuple.bimap(
+              (cmd_) =>
+                // We need to `scheduleForNextAnimationFrame` here again to ensure the note has loaded.
+                cmdExtra.scheduleForNextAnimationFrame(
+                  cmd.batch([cmd_, scrollToBottom])
+                ),
+              (idsToNoteModels) =>
+                Lens.fromProp<LoadedNotesModel>()("idsToNoteModels").modify(
+                  (idsToNoteModels_) =>
+                    map.union(
+                      id.getEq<"notes">(),
+                      note.Magma
+                    )(idsToNoteModels_)(idsToNoteModels)
+                )(loadedNotesModel)
             )
           )
       )
@@ -289,7 +296,7 @@ const LoadingNotes = ({
     [notes, dispatch]
   );
 
-  return <LoadingSpinner />;
+  return <LoadingSpinner className="m-8" />;
 };
 
 const LoadedNotes = ({
@@ -324,27 +331,29 @@ const LoadedNotes = ({
   );
 
   return (
-    <div className="flex flex-col flex-grow max-w-3xl divide-y-2 divide-stone">
-      {pipe(
-        idsToNoteModels,
-        map.values(note.Ord),
-        array.map((noteModel) => (
-          <React.Fragment key={noteModel.noteId.toString()}>
-            {pipe(
-              noteModel,
-              note.view,
-              html.map(
-                (noteMsg): Msg => ({
-                  _tag: "GotNoteMsg",
-                  noteId: noteModel.noteId,
-                  msg: noteMsg,
-                })
-              ),
-              apply(dispatch)
-            )}
-          </React.Fragment>
-        ))
-      )}
+    <div className="flex flex-col max-w-3xl mt-6">
+      <div className="flex flex-col">
+        {pipe(
+          idsToNoteModels,
+          map.values(note.Ord),
+          array.map((noteModel) => (
+            <React.Fragment key={noteModel.noteId.toString()}>
+              {pipe(
+                noteModel,
+                note.view,
+                html.map(
+                  (noteMsg): Msg => ({
+                    _tag: "GotNoteMsg",
+                    noteId: noteModel.noteId,
+                    msg: noteMsg,
+                  })
+                ),
+                apply(dispatch)
+              )}
+            </React.Fragment>
+          ))
+        )}
+      </div>
       <CreateNoteButton dispatch={dispatch} />
     </div>
   );
@@ -381,8 +390,11 @@ const CreateNoteButton = ({
 }: {
   dispatch: Dispatch<Msg>;
 }): ReactElement => (
-  <button onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}>
-    Create note
+  <button
+    className="sticky shadow-lg shadow-yellow-600/50 bottom-4 p-4 mt-4 mb-4 text-xl font-bold text-yellow-600 border-yellow-600 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 hover:border-yellow-600 active:text-yellow-50 active:bg-yellow-500 active:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 border-2 rounded-lg transition"
+    onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}
+  >
+    Create Note
   </button>
 );
 

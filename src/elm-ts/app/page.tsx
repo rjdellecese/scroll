@@ -6,7 +6,7 @@ import type { Location } from "elm-ts/lib/Navigation";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { tuple } from "fp-ts";
-import { flow, pipe } from "fp-ts/function";
+import { constVoid, flow, pipe } from "fp-ts/function";
 import * as React from "react";
 import { match, P } from "ts-pattern";
 
@@ -47,6 +47,11 @@ const routeToModelCmd = (route: Route): [Model, Cmd<Msg>] =>
     .with({ _tag: "SignUp" }, () => [{ _tag: "SignUp" }, cmd.none])
     .with({ _tag: "NotFound" }, () => [{ _tag: "NotFound" }, cmd.none])
     .exhaustive();
+
+export const isAuthPage = (model: Model) =>
+  match(model._tag)
+    .with("SignIn", "SignUp", () => true)
+    .otherwise(() => false);
 
 export const init: (location: Location) => [Model, Cmd<Msg>] = (location) =>
   pipe(location.pathname, route.fromLocationPathname, routeToModelCmd);
@@ -108,10 +113,10 @@ const layoutView =
   (dispatch) =>
     (
       <div>
-        <div className="sticky top-0 h-12 z-50 px-4 py-2 flex flex-row content-center justify-end border-b-2 border-b-stone-300 bg-stone-50">
+        <div className="sticky top-0 h-12 z-50 px-4 py-2 flex flex-row content-center justify-end shadow-md shadow-stone-400/30 bg-stone-50">
           <UserButton appearance={{ elements: { rootBox: "self-center" } }} />
         </div>
-        <div className="mt-8 mb-16 mx-4">{page(dispatch)}</div>
+        {page(dispatch)}
       </div>
     );
 

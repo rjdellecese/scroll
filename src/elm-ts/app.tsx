@@ -104,13 +104,13 @@ const ConvexProviderWithClerk = ({
   children,
   dispatch,
   convexClient,
-  pageModel,
+  isAuthPage,
   areFontsLoaded,
 }: {
   children?: ReactNode;
   dispatch: Dispatch<Msg>;
   convexClient: ConvexReactClient<API>;
-  pageModel: page.Model;
+  isAuthPage: boolean;
   areFontsLoaded: boolean;
 }) => {
   const { getToken, isSignedIn, isLoaded } = useAuth();
@@ -119,6 +119,7 @@ const ConvexProviderWithClerk = ({
   useEffect(() => {
     async function setAuth() {
       const token = await getToken({ template: "convex", skipCache: true });
+      console.log("getting token");
       if (token) {
         convexClient.setAuth(token);
         setClientAuthed(true);
@@ -135,12 +136,13 @@ const ConvexProviderWithClerk = ({
         };
       })
       .with(false, () =>
-        match(pageModel._tag)
-          .with("SignIn", "SignUp", constVoid)
-          .otherwise(() => dispatch({ _tag: "NotSignedIn" }))
+        match(isAuthPage)
+          .with(true, constVoid)
+          .with(false, () => dispatch({ _tag: "NotSignedIn" }))
+          .exhaustive()
       )
       .exhaustive();
-  }, [convexClient, getToken, isSignedIn, pageModel, dispatch]);
+  }, [convexClient, isSignedIn, isAuthPage, dispatch]);
 
   if (!isLoaded || !areFontsLoaded || (isSignedIn && !clientAuthed)) {
     return (
@@ -162,7 +164,7 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
       <ConvexProviderWithClerk
         dispatch={dispatch}
         convexClient={model.convex}
-        pageModel={model.page}
+        isAuthPage={page.isAuthPage(model.page)}
         areFontsLoaded={model.areFontsLoaded}
       >
         {pipe(

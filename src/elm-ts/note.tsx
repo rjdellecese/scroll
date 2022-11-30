@@ -368,11 +368,21 @@ const initializeEditorCmd = ({
               const callbackInterop: CallbackInterop<Msg> =
                 callbackManager.manageCallbacks<Msg>()();
 
+              // I measured this manually in Chrome. This is obviously brittle, but probably also good enough for now.
+              const scrollBounds = { top: 48, bottom: 90, left: 0, right: 0 };
+
               const editor: TiptapEditor = new TiptapEditor({
                 editorProps: {
                   attributes: {
-                    class: "flex-grow py-4 px-8 focus:outline-none",
+                    class:
+                      "py-4 px-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition",
                   },
+                  scrollMargin: {
+                    ...scrollBounds,
+                    top: scrollBounds.top + 32,
+                    bottom: scrollBounds.bottom + 32,
+                  },
+                  scrollThreshold: scrollBounds,
                 },
                 element: htmlElement,
                 // eslint-disable-next-line no-type-assertion/no-type-assertion
@@ -505,7 +515,7 @@ const Editor = ({
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div id={editorId(clientId)} className="flex-grow" />;
+  return <div id={editorId(clientId)} />;
 };
 
 const editorId = (clientId: string): string => `editor-${clientId}`;
