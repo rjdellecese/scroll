@@ -1,7 +1,7 @@
 import { ClerkProvider, useAuth } from "@clerk/clerk-react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProvider } from "convex/react";
-import { cmd, react as html, sub } from "elm-ts";
+import { cmd, react as html, sub, time } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Location } from "elm-ts/lib/Navigation";
 import { push } from "elm-ts/lib/Navigation";
@@ -29,6 +29,7 @@ import type { Stage } from "~src/elm-ts/stage";
 
 type Model = {
   stage: Stage;
+  currentTime: number;
   convex: ConvexReactClient<API>;
   page: page.Model;
   areFontsLoaded: boolean;
@@ -46,6 +47,7 @@ export const init: (
       ),
       (pageModel) => ({
         stage: flags.stage,
+        currentTime: flags.time,
         convex: new ConvexReactClient(clientConfig),
         page: pageModel,
         areFontsLoaded: false,
@@ -73,7 +75,8 @@ export const locationToMsg = (location: Location): Msg => ({
 export type Msg =
   | { _tag: "GotPageMsg"; msg: page.Msg }
   | { _tag: "FontsLoaded" }
-  | { _tag: "NotSignedIn" };
+  | { _tag: "NotSignedIn" }
+  | { _tag: "Tick"; newTime: number };
 
 export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
   match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
@@ -96,6 +99,10 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
       cmd.none,
     ])
     .with([{ _tag: "NotSignedIn" }, P.any], () => [model, push("/sign-in")])
+    .with([{ _tag: "Tick", newTime: P.select() }, P.any], (newTime) => [
+      Lens.fromProp<Model>()("currentTime").set(newTime)(model),
+      cmd.none,
+    ])
     .exhaustive();
 
 // VIEW
@@ -142,7 +149,7 @@ const ConvexProviderWithClerk = ({
           .exhaustive()
       )
       .exhaustive();
-  }, [convexClient, isSignedIn, isAuthPage, dispatch]);
+  }, [convexClient, isSignedIn, isAuthPage, dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isLoaded || !areFontsLoaded || (isSignedIn && !clientAuthed)) {
     return (
@@ -169,7 +176,7 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
       >
         {pipe(
           model.page,
-          page.view,
+          page.view(model.currentTime),
           html.map((pageMsg): Msg => ({ _tag: "GotPageMsg", msg: pageMsg })),
           apply(dispatch)
         )}
@@ -180,6 +187,9 @@ export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
 // SUBSCRIPTIONS
 
 export const subscriptions = (model: Model): Sub<Msg> =>
-  sub.map((pageMsg: page.Msg): Msg => ({ _tag: "GotPageMsg", msg: pageMsg }))(
-    page.subscriptions(model.page)
-  );
+  sub.batch([
+    time.every(1000, (newTime) => ({ _tag: "Tick", newTime })),
+    sub.map((pageMsg: page.Msg): Msg => ({ _tag: "GotPageMsg", msg: pageMsg }))(
+      page.subscriptions(model.page)
+    ),
+  ]);

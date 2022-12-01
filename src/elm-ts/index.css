@@ -89,20 +89,24 @@
     @apply my-6 pl-4 border-l-2 border-stone-500;
   }
   pre {
-    @apply bg-stone-200 my-4 p-4 rounded-lg;
+    @apply bg-stone-100 my-4 p-6 rounded-lg;
   }
   *:not(pre) > code {
     @apply p-1 rounded-md;
   }
   code {
-    @apply text-sm bg-stone-200;
+    @apply text-sm bg-stone-100;
   }
   hr {
     @apply border-t-2 border-stone-300;
   }
   a {
-    @apply text-yellow-600 hover:text-yellow-500 cursor-pointer underline transition-all;
+    @apply text-yellow-600 hover:text-yellow-50 hover:bg-yellow-600 cursor-pointer rounded-sm underline transition duration-75;
   }
+}
+
+.ProseMirror > *:first-child {
+  @apply mt-4;
 }
 
 @tailwind components;

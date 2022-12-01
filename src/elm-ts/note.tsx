@@ -11,6 +11,7 @@ import { constVoid, flow, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
 import type * as ord from "fp-ts/lib/Ord";
+import { DateTime } from "luxon";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
@@ -368,7 +369,7 @@ const initializeEditorCmd = ({
               const callbackInterop: CallbackInterop<Msg> =
                 callbackManager.manageCallbacks<Msg>()();
 
-              // I measured this manually in Chrome. This is obviously brittle, but probably also good enough for now.
+              // I measured this manually in Chrome. This is obviously brittle, but also probably good enough for now.
               const scrollBounds = { top: 48, bottom: 90, left: 0, right: 0 };
 
               const editor: TiptapEditor = new TiptapEditor({
@@ -439,39 +440,53 @@ const sendStepsCmd = (
 
 // VIEW
 
-export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
-  match(model)
-    .with({ _tag: "InitializingNote" }, ({ optionClientId, noteId, version }) =>
-      match(optionClientId)
-        .with({ _tag: "Some", value: P.select() }, (clientId) => (
+export const view: (currentTime: number) => (model: Model) => Html<Msg> =
+  (currentTime) => (model) => (dispatch) =>
+    match(model)
+      .with(
+        { _tag: "InitializingNote" },
+        ({ optionClientId, noteId, creationTime, version }) =>
+          match(optionClientId)
+            .with({ _tag: "Some", value: P.select() }, (clientId) => (
+              <Editor
+                dispatch={dispatch}
+                currentTime={currentTime}
+                noteId={noteId}
+                creationTime={creationTime}
+                clientId={clientId}
+                version={version}
+              />
+            ))
+            .with({ _tag: "None" }, () => <></>)
+            .exhaustive()
+      )
+      .with(
+        { _tag: "InitializedNote" },
+        ({ noteId, creationTime, clientId, editor }) => (
           <Editor
             dispatch={dispatch}
+            currentTime={currentTime}
+            creationTime={creationTime}
             noteId={noteId}
             clientId={clientId}
-            version={version}
+            version={collab.getVersion(editor.state)}
           />
-        ))
-        .with({ _tag: "None" }, () => <></>)
-        .exhaustive()
-    )
-    .with({ _tag: "InitializedNote" }, ({ noteId, clientId, editor }) => (
-      <Editor
-        dispatch={dispatch}
-        noteId={noteId}
-        clientId={clientId}
-        version={collab.getVersion(editor.state)}
-      />
-    ))
-    .exhaustive();
+        )
+      )
+      .exhaustive();
 
 const Editor = ({
   dispatch,
+  currentTime,
   noteId,
+  creationTime,
   clientId,
   version,
 }: {
   dispatch: Dispatch<Msg>;
+  currentTime: number;
   noteId: Id<"notes">;
+  creationTime: number;
   clientId: string;
   version: number;
 }): ReactElement => {
@@ -515,7 +530,35 @@ const Editor = ({
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div id={editorId(clientId)} />;
+  const creationDateTime = DateTime.fromMillis(creationTime);
+
+  const relativeFormattedCreationTime = match<boolean, string>(
+    DateTime.fromMillis(currentTime).diff(creationDateTime).as("minutes") < 1
+  )
+    .with(true, () => "less than a minute ago")
+    .with(false, () => creationDateTime.toRelative() || "")
+    .exhaustive();
+
+  const absoluteFormattedCreationTime: string = creationDateTime.toLocaleString(
+    {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      weekday: "short",
+      hour: "numeric",
+      minute: "numeric",
+    }
+  );
+
+  return (
+    <div className="flex flex-col gap-y-4">
+      <div className="text-stone-500 border-b-2 border-stone-300">
+        <span className="float-left">{relativeFormattedCreationTime}</span>
+        <span className="float-right">{absoluteFormattedCreationTime}</span>
+      </div>
+      <div id={editorId(clientId)} />
+    </div>
+  );
 };
 
 const editorId = (clientId: string): string => `editor-${clientId}`;

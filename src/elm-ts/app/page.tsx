@@ -6,7 +6,7 @@ import type { Location } from "elm-ts/lib/Navigation";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { tuple } from "fp-ts";
-import { constVoid, flow, pipe } from "fp-ts/function";
+import { flow, pipe } from "fp-ts/function";
 import * as React from "react";
 import { match, P } from "ts-pattern";
 
@@ -93,20 +93,22 @@ export const update =
 
 // VIEW
 
-export const view = (model: Model): Html<Msg> =>
-  match<Model, Html<Msg>>(model)
-    .with(
-      { _tag: "Home", model: P.select() },
-      flow(
-        home.view,
-        html.map((homeMsg): Msg => ({ _tag: "GotHomeMsg", msg: homeMsg })),
-        layoutView
+export const view =
+  (currentTime: number) =>
+  (model: Model): Html<Msg> =>
+    match<Model, Html<Msg>>(model)
+      .with(
+        { _tag: "Home", model: P.select() },
+        flow(
+          home.view(currentTime),
+          html.map((homeMsg): Msg => ({ _tag: "GotHomeMsg", msg: homeMsg })),
+          layoutView
+        )
       )
-    )
-    .with({ _tag: "SignIn" }, () => signIn.view)
-    .with({ _tag: "SignUp" }, () => signUp.view)
-    .with({ _tag: "NotFound" }, () => notFoundView)
-    .exhaustive();
+      .with({ _tag: "SignIn" }, () => signIn.view)
+      .with({ _tag: "SignUp" }, () => signUp.view)
+      .with({ _tag: "NotFound" }, () => notFoundView)
+      .exhaustive();
 
 const layoutView =
   (page: Html<Msg>): Html<Msg> =>

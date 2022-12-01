@@ -243,35 +243,37 @@ const scrollToBottom: Cmd<never> = pipe(
 
 // VIEW
 
-export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
-  (
-    <div className="flex justify-center">
-      {match<Model, ReactElement>(model)
-        .with({ _tag: "LoadingNotes" }, () => (
-          <LoadingNotes dispatch={dispatch} />
-        ))
-        .with(
-          { _tag: "LoadedNotes", idsToNoteModels: P.select() },
-          (idsToNoteModels) =>
-            pipe(
-              idsToNoteModels,
-              map.values(note.Ord),
-              array.last,
-              option.match(
-                () => <NoNotes dispatch={dispatch} />,
-                ({ creationTime }) => (
-                  <LoadedNotes
-                    dispatch={dispatch}
-                    idsToNoteModels={idsToNoteModels}
-                    latestCreationTime={creationTime}
-                  />
+export const view: (currentTime: number) => (model: Model) => Html<Msg> =
+  (currentTime) => (model) => (dispatch) =>
+    (
+      <div className="flex justify-center">
+        {match<Model, ReactElement>(model)
+          .with({ _tag: "LoadingNotes" }, () => (
+            <LoadingNotes dispatch={dispatch} />
+          ))
+          .with(
+            { _tag: "LoadedNotes", idsToNoteModels: P.select() },
+            (idsToNoteModels) =>
+              pipe(
+                idsToNoteModels,
+                map.values(note.Ord),
+                array.last,
+                option.match(
+                  () => <NoNotes dispatch={dispatch} />,
+                  ({ creationTime }) => (
+                    <LoadedNotes
+                      dispatch={dispatch}
+                      currentTime={currentTime}
+                      idsToNoteModels={idsToNoteModels}
+                      latestCreationTime={creationTime}
+                    />
+                  )
                 )
               )
-            )
-        )
-        .exhaustive()}
-    </div>
-  );
+          )
+          .exhaustive()}
+      </div>
+    );
 
 const LoadingNotes = ({
   dispatch,
@@ -301,10 +303,12 @@ const LoadingNotes = ({
 
 const LoadedNotes = ({
   dispatch,
+  currentTime,
   idsToNoteModels,
   latestCreationTime,
 }: {
   dispatch: Dispatch<Msg>;
+  currentTime: number;
   idsToNoteModels: Map<Id<"notes">, note.Model>;
   latestCreationTime: number;
 }): ReactElement => {
@@ -331,8 +335,8 @@ const LoadedNotes = ({
   );
 
   return (
-    <div className="flex flex-col max-w-3xl mt-6">
-      <div className="flex flex-col">
+    <div className="flex flex-col max-w-3xl w-full mt-6">
+      <div className="flex flex-col gap-y-8">
         {pipe(
           idsToNoteModels,
           map.values(note.Ord),
@@ -340,7 +344,7 @@ const LoadedNotes = ({
             <React.Fragment key={noteModel.noteId.toString()}>
               {pipe(
                 noteModel,
-                note.view,
+                note.view(currentTime),
                 html.map(
                   (noteMsg): Msg => ({
                     _tag: "GotNoteMsg",
@@ -391,7 +395,7 @@ const CreateNoteButton = ({
   dispatch: Dispatch<Msg>;
 }): ReactElement => (
   <button
-    className="sticky shadow-lg shadow-yellow-600/50 bottom-4 p-4 mt-4 mb-4 text-xl font-bold text-yellow-600 border-yellow-600 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 hover:border-yellow-600 active:text-yellow-50 active:bg-yellow-500 active:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 border-2 rounded-lg transition"
+    className="sticky shadow-lg shadow-yellow-600/50 bottom-4 p-4 mt-4 mb-4 text-xl font-bold text-yellow-600 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 active:text-yellow-50 active:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 rounded-lg transition duration-100"
     onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}
   >
     Create Note
