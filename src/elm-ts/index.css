@@ -103,6 +103,9 @@
   a {
     @apply text-yellow-600 hover:text-yellow-50 hover:bg-yellow-600 cursor-pointer rounded-sm underline transition duration-75;
   }
+  button {
+    @apply select-none;
+  }
 }
 
 .ProseMirror > *:first-child {
