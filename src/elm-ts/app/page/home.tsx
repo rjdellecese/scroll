@@ -246,32 +246,36 @@ const scrollToBottom: Cmd<never> = pipe(
 export const view: (currentTime: number) => (model: Model) => Html<Msg> =
   (currentTime) => (model) => (dispatch) =>
     (
-      <div className="flex justify-center">
-        {match<Model, ReactElement>(model)
-          .with({ _tag: "LoadingNotes" }, () => (
-            <LoadingNotes dispatch={dispatch} />
-          ))
-          .with(
-            { _tag: "LoadedNotes", idsToNoteModels: P.select() },
-            (idsToNoteModels) =>
-              pipe(
-                idsToNoteModels,
-                map.values(note.Ord),
-                array.last,
-                option.match(
-                  () => <NoNotes dispatch={dispatch} />,
-                  ({ creationTime }) => (
-                    <LoadedNotes
-                      dispatch={dispatch}
-                      currentTime={currentTime}
-                      idsToNoteModels={idsToNoteModels}
-                      latestCreationTime={creationTime}
-                    />
+      // We set the height to the viewport height minus the height of the header.
+      // Source: https://stackoverflow.com/a/72673613
+      <div className="flex flex-col h-[calc(100vh-64px)] items-center">
+        <div className="flex flex-col grow justify-end max-w-3xl w-full mt-6">
+          {match<Model, ReactElement>(model)
+            .with({ _tag: "LoadingNotes" }, () => (
+              <LoadingNotes dispatch={dispatch} />
+            ))
+            .with(
+              { _tag: "LoadedNotes", idsToNoteModels: P.select() },
+              (idsToNoteModels) =>
+                pipe(
+                  idsToNoteModels,
+                  map.values(note.Ord),
+                  array.last,
+                  option.match(
+                    () => <NoNotes dispatch={dispatch} />,
+                    ({ creationTime }) => (
+                      <LoadedNotes
+                        dispatch={dispatch}
+                        currentTime={currentTime}
+                        idsToNoteModels={idsToNoteModels}
+                        latestCreationTime={creationTime}
+                      />
+                    )
                   )
                 )
-              )
-          )
-          .exhaustive()}
+            )
+            .exhaustive()}
+        </div>
       </div>
     );
 
@@ -298,7 +302,7 @@ const LoadingNotes = ({
     [notes, dispatch]
   );
 
-  return <LoadingSpinner className="m-8" />;
+  return <LoadingSpinner className="place-self-center m-8" />;
 };
 
 const LoadedNotes = ({
@@ -335,7 +339,7 @@ const LoadedNotes = ({
   );
 
   return (
-    <div className="flex flex-col max-w-3xl w-full mt-6">
+    <>
       <div className="flex flex-col gap-y-8">
         {pipe(
           idsToNoteModels,
@@ -359,7 +363,7 @@ const LoadedNotes = ({
         )}
       </div>
       <CreateNoteButton dispatch={dispatch} />
-    </div>
+    </>
   );
 };
 
