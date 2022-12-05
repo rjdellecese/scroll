@@ -126,7 +126,6 @@ const ConvexProviderWithClerk = ({
   useEffect(() => {
     async function setAuth() {
       const token = await getToken({ template: "convex", skipCache: true });
-      console.log("getting token");
       if (token) {
         convexClient.setAuth(token);
         setClientAuthed(true);

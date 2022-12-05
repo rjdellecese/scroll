@@ -1,12 +1,13 @@
-import type { NamedQuery } from "convex/browser";
 import type { ConvexReactClient } from "convex/react";
 import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import { array, either, map, option, tuple } from "fp-ts";
-import { apply, constVoid, flow, pipe } from "fp-ts/function";
+import { array, either, eq, map, option, readonlyArray, tuple } from "fp-ts";
+import { apply, constVoid, flow, identity, pipe } from "fp-ts/function";
+import type { Either } from "fp-ts/lib/Either";
 import type { IO } from "fp-ts/lib/IO";
+import { useStableEffect } from "fp-ts-react-stable-hooks";
 import { Lens } from "monocle-ts";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
@@ -14,7 +15,7 @@ import { match, P } from "ts-pattern";
 
 import type { API } from "~src/convex/_generated/api";
 import type { Document, Id } from "~src/convex/_generated/dataModel";
-import { useQuery } from "~src/convex/_generated/react";
+import { usePaginatedQuery, useQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
@@ -23,6 +24,9 @@ import * as logMessage from "~src/elm-ts/log-message";
 import * as note from "~src/elm-ts/note";
 import type { Stage } from "~src/elm-ts/stage";
 import * as id from "~src/id";
+import * as usePaginatedQueryResultExtra from "~src/use-paginated-query-result-extra";
+import type { VersionedNote } from "~src/versioned-note";
+import * as versionedNote from "~src/versioned-note";
 
 // MODEl
 
@@ -32,7 +36,7 @@ type LoadingNotesModel = { _tag: "LoadingNotes" };
 
 type LoadedNotesModel = {
   _tag: "LoadedNotes";
-  idsToNoteModels: Map<Id<"notes">, note.Model>;
+  noteModels: note.Model[];
 };
 
 export const init: Model = {
@@ -45,17 +49,11 @@ export type Msg =
   | { _tag: "CreateNoteButtonClicked" }
   | {
       _tag: "GotNotes";
-      idsToNotes: Map<
-        Id<"notes">,
-        { proseMirrorDoc: string; creationTime: number; version: number }
-      >;
+      noteIds: Id<"notes">[];
+      loadMore: Cmd<Msg>;
     }
   | {
-      _tag: "GotNotesSince";
-      idsToNotes: Map<
-        Id<"notes">,
-        { proseMirrorDoc: string; creationTime: number; version: number }
-      >;
+      _tag: "GotUnexpectedPaginationState";
     }
   | {
       _tag: "GotNoteMsg";
@@ -78,17 +76,17 @@ export const update =
         [
           {
             _tag: "GotNotes",
-            idsToNotes: P.select(),
+            noteIds: P.select(),
           },
-          { _tag: P.union("LoadingNotes", "LoadedNotes") },
+          { _tag: "LoadingNotes" },
         ],
         flow(
-          idsToNotesToIdsToNoteModels,
+          noteIdsToNoteModels,
           tuple.bimap(
             (cmd_) => cmd.batch([cmd_, scrollToBottom]),
-            (idsToNoteModels): LoadedNotesModel => ({
+            (noteModels): LoadedNotesModel => ({
               _tag: "LoadedNotes",
-              idsToNoteModels,
+              noteModels,
             })
           )
         )
@@ -96,33 +94,31 @@ export const update =
       .with(
         [
           {
-            _tag: "GotNotesSince",
-            idsToNotes: P.select("idsToNotes"),
+            _tag: "GotNotes",
+            noteIds: P.select("noteIds"),
           },
-          P.select("loadedNotesModel", {
-            _tag: "LoadedNotes",
-          }),
+          P.select("loadedNotesModel", { _tag: "LoadedNotes" }),
         ],
-        ({ idsToNotes, loadedNotesModel }) =>
-          pipe(
-            idsToNotes,
-            idsToNotesToIdsToNoteModels,
-            tuple.bimap(
-              (cmd_) =>
-                // We need to `scheduleForNextAnimationFrame` here again to ensure the note has loaded.
-                cmdExtra.scheduleForNextAnimationFrame(
-                  cmd.batch([cmd_, scrollToBottom])
-                ),
-              (idsToNoteModels) =>
-                Lens.fromProp<LoadedNotesModel>()("idsToNoteModels").modify(
-                  (idsToNoteModels_) =>
-                    map.union(
-                      id.getEq<"notes">(),
-                      note.Magma
-                    )(idsToNoteModels_)(idsToNoteModels)
-                )(loadedNotesModel)
-            )
-          )
+        ({ noteIds, loadedNotesModel }) =>
+          either.match(
+            (logMessage_: LogMessage): [Model, Cmd<Msg>] => [
+              loadedNotesModel,
+              logMessage.report(stage)(logMessage_),
+            ],
+            ([noteModels, cmd]: [note.Model[], Cmd<Msg>]): [
+              Model,
+              Cmd<Msg>
+            ] => [{ _tag: "LoadedNotes", noteModels }, cmd]
+          )(reconcileNotes(noteIds, loadedNotesModel.noteModels))
+      )
+      .with(
+        [{ _tag: "GotUnexpectedPaginationState" }, { _tag: "LoadingNotes" }],
+        () => [
+          model,
+          logMessage.report(stage)(
+            logMessage.error("Got unexpected pagination state")
+          ),
+        ]
       )
       .with(
         [
@@ -137,35 +133,61 @@ export const update =
         ],
         ({ noteId, noteMsg, loadedNotesModel }) =>
           pipe(
-            loadedNotesModel.idsToNoteModels,
-            map.lookup(id.getEq<"notes">())(noteId),
-            either.fromOption(() =>
-              logMessage.error("Failed to find note by ID")
+            either.Do,
+            either.bind("noteIndex", () =>
+              pipe(
+                loadedNotesModel.noteModels,
+                array.findIndex<note.Model>((noteModel) =>
+                  id.getEq<"notes">().equals(noteId, note.noteId(noteModel))
+                ),
+                either.fromOption(() =>
+                  logMessage.error("Failed to find note index by ID")
+                )
+              )
+            ),
+            either.bind("noteModel", ({ noteIndex }) =>
+              pipe(
+                loadedNotesModel.noteModels,
+                array.lookup(noteIndex),
+                either.fromOption(() =>
+                  logMessage.error("Failed to find note by index")
+                )
+              )
+            ),
+            either.chain(({ noteIndex, noteModel }) =>
+              pipe(
+                note.update(stage, convex)(noteMsg, noteModel),
+                ([noteModel_, noteCmd]): Either<
+                  LogMessage,
+                  [LoadedNotesModel, Cmd<Msg>]
+                > =>
+                  pipe(
+                    loadedNotesModel.noteModels,
+                    array.updateAt(noteIndex, noteModel_),
+                    either.fromOption(() =>
+                      logMessage.error("Failed to update note by index")
+                    ),
+                    either.map((noteModels): [LoadedNotesModel, Cmd<Msg>] => [
+                      Lens.fromProp<LoadedNotesModel>()("noteModels").set(
+                        noteModels
+                      )(loadedNotesModel),
+                      cmd.map(
+                        (noteMsg_: note.Msg): Msg => ({
+                          _tag: "GotNoteMsg",
+                          noteId: note.noteId(noteModel),
+                          msg: noteMsg_,
+                        })
+                      )(noteCmd),
+                    ])
+                  )
+              )
             ),
             either.match(
               (logMessage_: LogMessage) => [
                 loadedNotesModel,
                 logMessage.report(stage)(logMessage_),
               ],
-              (noteModel) =>
-                pipe(
-                  note.update(stage, convex)(noteMsg, noteModel),
-                  tuple.bimap(
-                    cmd.map(
-                      (noteMsg_): Msg => ({
-                        _tag: "GotNoteMsg",
-                        noteId,
-                        msg: noteMsg_,
-                      })
-                    ),
-                    (noteModel): LoadedNotesModel =>
-                      Lens.fromProp<LoadedNotesModel>()(
-                        "idsToNoteModels"
-                      ).modify(
-                        map.upsertAt(id.getEq<"notes">())(noteId, noteModel)
-                      )(loadedNotesModel)
-                  )
-                )
+              identity
             )
           )
       )
@@ -176,64 +198,104 @@ export const update =
         ),
       ]);
 
-const idsToNotesToIdsToNoteModels = (
-  idsToNotes: Map<
-    Id<"notes">,
-    {
-      proseMirrorDoc: Document<"notes">["proseMirrorDoc"];
-      creationTime: number;
-      version: number;
-    }
-  >
-): [Map<Id<"notes">, note.Model>, Cmd<Msg>] =>
+const reconcileNotes = (
+  latestNoteIds: Id<"notes">[],
+  currentNoteModels: note.Model[]
+): Either<LogMessage, [note.Model[], Cmd<Msg>]> =>
   pipe(
-    idsToNotes,
-    map.reduceWithIndex<Id<"notes">>(id.getOrd<"notes">())<
-      {
-        idsToNoteModels: Map<Id<"notes">, note.Model>;
-        cmds: Cmd<Msg>[];
-      },
-      {
-        proseMirrorDoc: Document<"notes">["proseMirrorDoc"];
-        creationTime: number;
-        version: number;
-      }
-    >(
-      {
-        idsToNoteModels: new Map(),
-        cmds: [],
-      },
-      (
-        noteId,
-        { idsToNoteModels, cmds },
-        { proseMirrorDoc, creationTime, version }
-      ) =>
+    latestNoteIds,
+    array.difference(id.getEq<"notes">())(
+      array.map(note.noteId)(currentNoteModels)
+    ),
+    array.reduce<Id<"notes">, [note.Model[], Cmd<Msg>[]]>(
+      [[], []],
+      (result, noteId) =>
         pipe(
-          note.init({ noteId, creationTime, proseMirrorDoc, version }),
-          tuple.mapSnd(
-            cmd.map(
-              (noteMsg): Msg => ({
-                _tag: "GotNoteMsg",
-                noteId,
-                msg: noteMsg,
-              })
-            )
-          ),
-          ([noteModel, cmd_]) => ({
-            idsToNoteModels: map.upsertAt(id.getEq<"notes">())(
-              noteId,
-              noteModel
-            )(idsToNoteModels),
-            cmds: array.append(cmd_)(cmds),
-          })
+          noteId,
+          note.init,
+          tuple.bimap(
+            (noteCmd) =>
+              array.prepend(
+                cmd.map(
+                  (noteMsg_: note.Msg): Msg => ({
+                    _tag: "GotNoteMsg",
+                    noteId,
+                    msg: noteMsg_,
+                  })
+                )(noteCmd)
+              )(tuple.snd(result)),
+            (noteModel) => array.prepend(noteModel)(tuple.fst(result))
+          )
         )
     ),
-    ({ idsToNoteModels, cmds }) => [idsToNoteModels, cmd.batch(cmds)]
+    (newNoteModelCmds) =>
+      pipe(
+        latestNoteIds,
+        either.traverseArray((latestNoteId) =>
+          pipe(
+            newNoteModelCmds,
+            tuple.fst,
+            array.findFirst((noteModel: note.Model): boolean =>
+              id.getEq<"notes">().equals(note.noteId(noteModel), latestNoteId)
+            ),
+            option.match(
+              () =>
+                pipe(
+                  currentNoteModels,
+                  array.findFirst((noteModel: note.Model): boolean =>
+                    id
+                      .getEq<"notes">()
+                      .equals(note.noteId(noteModel), latestNoteId)
+                  )
+                ),
+              (noteModel) => option.some(noteModel)
+            ),
+            either.fromOption(() =>
+              logMessage.error(
+                "Failed to find a note model corresponding to a given note ID"
+              )
+            )
+          )
+        ),
+        either.map((noteModels) => [
+          readonlyArray.toArray(noteModels),
+          cmd.batch(tuple.snd(newNoteModelCmds)),
+        ])
+      )
+  );
+
+const noteIdsToNoteModels = (
+  noteIds: Id<"notes">[]
+): [note.Model[], Cmd<Msg>] =>
+  pipe(
+    noteIds,
+    array.reduce<Id<"notes">, [note.Model[], Cmd<Msg>[]]>(
+      [[], []],
+      (result, noteId) =>
+        pipe(
+          noteId,
+          note.init,
+          tuple.bimap(
+            flow(
+              cmd.map(
+                (noteMsg): Msg => ({
+                  _tag: "GotNoteMsg",
+                  noteId: noteId,
+                  msg: noteMsg,
+                })
+              ),
+              (noteCmd) => array.append(noteCmd)(tuple.snd(result))
+            ),
+            (noteModel) => array.append(noteModel)(tuple.fst(result))
+          )
+        )
+    ),
+    tuple.mapSnd(cmd.batch)
   );
 
 const scrollToBottom: Cmd<never> = pipe(
   cmdExtra.fromIOVoid(() =>
-    // I haven't been able to figure out why, but we need to wait one more animation frame here to ensure that everything is rendered before we try to scroll to the bottom. This works, but isn't ideal.
+    // I haven't been able to figure out why, but we need to wait one more animation frame here to ensure that everything is rendered before we try to scroll to the bottom.
     window.scrollTo({
       top: document.body.scrollHeight,
     })
@@ -245,153 +307,125 @@ const scrollToBottom: Cmd<never> = pipe(
 
 export const view: (currentTime: number) => (model: Model) => Html<Msg> =
   (currentTime) => (model) => (dispatch) =>
-    (
-      // We set the height to the viewport height minus the height of the header.
-      // Source: https://stackoverflow.com/a/72673613
-      <div className="flex flex-col h-[calc(100vh-64px)] items-center">
-        <div className="flex flex-col grow justify-end max-w-3xl w-full mt-6">
-          {match<Model, ReactElement>(model)
-            .with({ _tag: "LoadingNotes" }, () => (
-              <LoadingNotes dispatch={dispatch} />
-            ))
-            .with(
-              { _tag: "LoadedNotes", idsToNoteModels: P.select() },
-              (idsToNoteModels) =>
-                pipe(
-                  idsToNoteModels,
-                  map.values(note.Ord),
-                  array.last,
-                  option.match(
-                    () => <NoNotes dispatch={dispatch} />,
-                    ({ creationTime }) => (
-                      <LoadedNotes
-                        dispatch={dispatch}
-                        currentTime={currentTime}
-                        idsToNoteModels={idsToNoteModels}
-                        latestCreationTime={creationTime}
-                      />
-                    )
-                  )
-                )
-            )
-            .exhaustive()}
-        </div>
-      </div>
-    );
+    <View currentTime={currentTime} model={model} dispatch={dispatch} />;
 
-const LoadingNotes = ({
+const View = ({
+  currentTime,
+  model,
   dispatch,
 }: {
+  currentTime: number;
+  model: Model;
   dispatch: Dispatch<Msg>;
 }): ReactElement => {
-  const notes = option.fromNullable(useQuery("getNotes"));
+  const paginatedNoteIds = usePaginatedQuery("getNotes", {
+    initialNumItems: 10,
+  });
 
-  React.useEffect(
-    () =>
-      pipe(
-        notes,
-        option.match(
-          constVoid,
-          (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): void =>
+  useStableEffect(
+    () => {
+      match(paginatedNoteIds)
+        .with({ status: "LoadingMore", results: [] }, constVoid)
+        .with(
+          {
+            status: P.union("CanLoadMore", "Exhausted"),
+            results: P.select("noteIds"),
+            loadMore: P.select("loadMore"),
+          },
+          ({ noteIds, loadMore }) =>
             dispatch({
               _tag: "GotNotes",
-              idsToNotes,
+              noteIds,
+              loadMore: cmdExtra.fromIOVoid(
+                pipe(
+                  loadMore,
+                  option.fromNullable,
+                  option.match(
+                    () => constVoid,
+                    (loadMore_: (numItems: number) => void) => () =>
+                      loadMore_(5)
+                  )
+                )
+              ),
             })
         )
-      ),
-    [notes, dispatch]
+        .otherwise(() => dispatch({ _tag: "GotUnexpectedPaginationState" }));
+    },
+    [paginatedNoteIds],
+    eq.tuple(usePaginatedQueryResultExtra.getEq(id.getEq<"notes">()))
   );
 
-  return <LoadingSpinner className="place-self-center m-8" />;
+  return (
+    // We set the height to the viewport height minus the height of the header.
+    // Source: https://stackoverflow.com/a/72673613
+    <div className="flex flex-col items-center">
+      <div className="flex flex-col grow justify-end max-w-3xl w-full mt-6">
+        {match<Model, ReactElement>(model)
+          .with({ _tag: "LoadingNotes" }, () => <LoadingNotes />)
+          .with({ _tag: "LoadedNotes", noteModels: P.select() }, (noteModels) =>
+            pipe(
+              noteModels,
+              array.last,
+              option.match(
+                () => <NoNotes dispatch={dispatch} />,
+                () => (
+                  <LoadedNotes
+                    dispatch={dispatch}
+                    currentTime={currentTime}
+                    noteModels={noteModels}
+                  />
+                )
+              )
+            )
+          )
+          .exhaustive()}
+      </div>
+    </div>
+  );
 };
+
+const LoadingNotes = (): ReactElement => (
+  <LoadingSpinner className="place-self-center m-8" />
+);
 
 const LoadedNotes = ({
   dispatch,
   currentTime,
-  idsToNoteModels,
-  latestCreationTime,
+  noteModels,
 }: {
   dispatch: Dispatch<Msg>;
   currentTime: number;
-  idsToNoteModels: Map<Id<"notes">, note.Model>;
-  latestCreationTime: number;
-}): ReactElement => {
-  const notesSince = option.fromNullable(
-    useQuery("getNotesSince", latestCreationTime)
-  );
-
-  React.useEffect(
-    () =>
-      option.match(
-        constVoid,
-        (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): void =>
-          match(map.isEmpty(idsToNotes))
-            .with(false, () =>
-              dispatch({
-                _tag: "GotNotesSince",
-                idsToNotes,
-              })
-            )
-            .with(true, constVoid)
-            .exhaustive()
-      )(notesSince),
-    [notesSince, dispatch]
-  );
-
-  return (
-    <>
-      <div className="flex flex-col gap-y-8">
-        {pipe(
-          idsToNoteModels,
-          map.values(note.Ord),
-          array.map((noteModel) => (
-            <React.Fragment key={noteModel.noteId.toString()}>
-              {pipe(
-                noteModel,
-                note.view(currentTime),
-                html.map(
-                  (noteMsg): Msg => ({
-                    _tag: "GotNoteMsg",
-                    noteId: noteModel.noteId,
-                    msg: noteMsg,
-                  })
-                ),
-                apply(dispatch)
-              )}
-            </React.Fragment>
-          ))
-        )}
-      </div>
-      <CreateNoteButton dispatch={dispatch} />
-    </>
-  );
-};
-
-const NoNotes = ({ dispatch }: { dispatch: Dispatch<Msg> }): ReactElement => {
-  const notes = option.fromNullable(useQuery("getNotes"));
-
-  React.useEffect(
-    () =>
-      option.match(
-        () => constVoid,
-        (idsToNotes: ReturnType<NamedQuery<API, "getNotes">>): IO<void> =>
-          match(map.isEmpty(idsToNotes))
-            .with(
-              false,
-              () => () =>
-                dispatch({
-                  _tag: "GotNotes",
-                  idsToNotes,
+  noteModels: note.Model[];
+}): ReactElement => (
+  <>
+    <div className="flex flex-col gap-y-8">
+      {pipe(
+        noteModels,
+        array.map((noteModel) => (
+          <React.Fragment key={note.noteId(noteModel).toString()}>
+            {pipe(
+              noteModel,
+              note.view(currentTime),
+              html.map(
+                (noteMsg): Msg => ({
+                  _tag: "GotNoteMsg",
+                  noteId: note.noteId(noteModel),
+                  msg: noteMsg,
                 })
-            )
-            .with(true, () => constVoid)
-            .exhaustive()
-      )(notes)(),
-    [notes, dispatch]
-  );
+              ),
+              apply(dispatch)
+            )}
+          </React.Fragment>
+        ))
+      )}
+    </div>
+    <CreateNoteButton dispatch={dispatch} />
+  </>
+);
 
-  return <CreateNoteButton dispatch={dispatch} />;
-};
+const NoNotes = ({ dispatch }: { dispatch: Dispatch<Msg> }): ReactElement => (
+  <CreateNoteButton dispatch={dispatch} />
+);
 
 const CreateNoteButton = ({
   dispatch,
@@ -411,21 +445,18 @@ const CreateNoteButton = ({
 export const subscriptions = (model: Model) => {
   return match<Model, Sub<Msg>>(model)
     .with({ _tag: "LoadingNotes" }, () => sub.none)
-    .with({ _tag: "LoadedNotes" }, ({ idsToNoteModels: editors }) =>
+    .with({ _tag: "LoadedNotes", noteModels: P.select() }, (noteModels) =>
       pipe(
-        editors,
-        map.reduceWithIndex<Id<"notes">>(id.getOrd<"notes">())<
-          Sub<Msg>[],
-          note.Model
-        >([], (noteId, subs, editorModel) =>
+        noteModels,
+        array.reduce<note.Model, Sub<Msg>[]>([], (subs, noteModel) =>
           array.append(
             pipe(
-              editorModel,
+              noteModel,
               note.subscriptions,
               sub.map(
                 (editorMsg): Msg => ({
                   _tag: "GotNoteMsg",
-                  noteId,
+                  noteId: note.noteId(noteModel),
                   msg: editorMsg,
                 })
               )

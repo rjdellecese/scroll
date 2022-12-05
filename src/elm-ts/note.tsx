@@ -1,16 +1,17 @@
-import { Editor as TiptapEditor, Extension } from "@tiptap/core";
+import type { Editor } from "@tiptap/core";
+import { Extension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
+import { EditorContent, useEditor } from "@tiptap/react";
 import type { ConvexReactClient } from "convex/react";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import type { magma } from "fp-ts";
-import { io, nonEmptyArray, number, option, readonlyArray, tuple } from "fp-ts";
-import { constVoid, flow, pipe } from "fp-ts/function";
+import { eq, io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
+import { constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
-import type * as ord from "fp-ts/lib/Ord";
+import { useStableEffect } from "fp-ts-react-stable-hooks";
 import { DateTime } from "luxon";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
@@ -22,107 +23,98 @@ import { match, P } from "ts-pattern";
 import type { API } from "~src/convex/_generated/api";
 import type { Id } from "~src/convex/_generated/dataModel";
 import { useQuery } from "~src/convex/_generated/react";
-import type {
-  CallbackInterop,
-  CallbackManager,
-} from "~src/elm-ts/callback-manager";
-import * as callbackManager from "~src/elm-ts/callback-manager";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import * as logMessage from "~src/elm-ts/log-message";
 import { extensions } from "~src/tiptap-schema-extensions";
+import type { VersionedNote } from "~src/versioned-note";
+import * as versionedNote from "~src/versioned-note";
 
 import type { Stage } from "./stage";
 
 // MODEL
 
-export type Model = InitializingNoteModel | InitializedNoteModel;
+export type Model = LoadingNoteAndClientId | LoadingEditor | Loaded;
 
-type InitializingNoteModel = {
-  _tag: "InitializingNote";
+type LoadingNoteAndClientId = {
+  _tag: "LoadingNoteAndClientId";
   noteId: Id<"notes">;
-  creationTime: number;
-  proseMirrorDoc: string;
-  version: number;
+  optionVersionedNote: Option<VersionedNote>;
   optionClientId: Option<string>;
-  didComponentMount: boolean;
 };
 
-type InitializedNoteModel = {
-  _tag: "InitializedNote";
+type LoadingEditor = {
+  _tag: "LoadingEditor";
+  versionedNote: VersionedNote;
+  clientId: string;
+};
+
+type Loaded = {
+  _tag: "Loaded";
   noteId: Id<"notes">;
   creationTime: number;
+  initialProseMirrorDoc: string;
+  initialVersion: number;
   clientId: string;
-  editor: TiptapEditor;
-  callbackManager: CallbackManager<Msg>;
+  editor: Editor;
   areStepsInFlight: boolean;
 };
 
-export const Ord: ord.Ord<Model> = {
-  equals: (x, y) => x.noteId.equals(y.noteId),
-  compare: (first, second) =>
-    number.Ord.compare(first.creationTime, second.creationTime),
-};
-
-export const Magma: magma.Magma<Model> = {
-  concat: (x, _y) => x,
-};
-
-export const init = ({
-  noteId,
-  creationTime,
-  proseMirrorDoc,
-  version,
-}: {
-  noteId: Id<"notes">;
-  creationTime: number;
-  proseMirrorDoc: string;
-  version: number;
-}): [Model, Cmd<Msg>] => [
+export const init = (noteId: Id<"notes">): [Model, Cmd<Msg>] => [
   {
-    _tag: "InitializingNote",
+    _tag: "LoadingNoteAndClientId",
     noteId,
-    creationTime,
-    proseMirrorDoc,
-    version,
+    optionVersionedNote: option.none,
     optionClientId: option.none,
-    didComponentMount: false,
   },
   pipe(
     () => crypto.randomUUID(),
     io.map(
       (clientId): Msg => ({
-        _tag: "GotInitializingNoteMsg",
-        msg: { _tag: "GeneratedClientId", clientId },
+        _tag: "GotLoadingNoteAndClientIdMsg",
+        msg: { _tag: "ClientIdGenerated", clientId },
       })
     ),
     cmdExtra.fromIO
   ),
 ];
 
+export const noteId = (model: Model): Id<"notes"> =>
+  match(model)
+    .with({ _tag: "LoadingNoteAndClientId", noteId: P.select() }, identity)
+    .with(
+      { _tag: "LoadingEditor", versionedNote: { _id: P.select() } },
+      identity
+    )
+    .with({ _tag: "Loaded", noteId: P.select() }, identity)
+    .exhaustive();
+
 // UPDATE
 
 export type Msg =
-  | { _tag: "GotInitializingNoteMsg"; msg: InitializingNoteMsg }
-  | { _tag: "GotInitializedNoteMsg"; msg: InitializedNoteMsg };
+  | { _tag: "GotLoadingNoteAndClientIdMsg"; msg: LoadingNoteAndClientIdMsg }
+  | { _tag: "GotLoadingEditorMsg"; msg: LoadingEditorMsg }
+  | { _tag: "GotLoadedMsg"; msg: LoadedMsg };
 
-type InitializingNoteMsg =
-  | { _tag: "ComponentDidMount" }
+type LoadingNoteAndClientIdMsg =
   | {
-      _tag: "EditorWasInitialized";
-      editor: TiptapEditor;
-      callbackManager: CallbackManager<Msg>;
+      _tag: "ClientIdGenerated";
+      clientId: string;
     }
-  | { _tag: "GeneratedClientId"; clientId: string };
+  | { _tag: "VersionedNoteReceived"; versionedNote: VersionedNote };
 
-type InitializedNoteMsg =
+type LoadingEditorMsg = {
+  _tag: "EditorLoaded";
+  editor: Editor;
+};
+
+type LoadedMsg =
   | { _tag: "EditorTransactionApplied" }
   | { _tag: "StepsSent" }
   | {
-      _tag: "ReceivedSteps";
+      _tag: "StepsReceived";
       steps: NonEmptyArray<{ proseMirrorStep: string; clientId: string }>;
-    }
-  | { _tag: "ComponentWillUnmount" };
+    };
 
 export const update =
   (stage: Stage, convex: ConvexReactClient<API>) =>
@@ -131,98 +123,144 @@ export const update =
       .with(
         [
           {
-            _tag: "GotInitializingNoteMsg",
-            msg: P.select("initializingNoteMsg"),
+            _tag: "GotLoadingNoteAndClientIdMsg",
+            msg: P.select("loadingNoteAndClientIdMsg"),
           },
-          P.select("initializingNoteModel", { _tag: "InitializingNote" }),
+          P.select("loadingNoteAndClientIdModel", {
+            _tag: "LoadingNoteAndClientId",
+          }),
         ],
-        ({ initializingNoteMsg, initializingNoteModel }) =>
-          match<InitializingNoteMsg, [Model, Cmd<Msg>]>(initializingNoteMsg)
-            .with(
-              { _tag: "GeneratedClientId", clientId: P.select() },
-              (clientId) =>
-                pipe(
-                  initializingNoteModel,
-                  Lens.fromProp<InitializingNoteModel>()("optionClientId").set(
+        ({ loadingNoteAndClientIdMsg, loadingNoteAndClientIdModel }) =>
+          pipe(
+            match<
+              LoadingNoteAndClientIdMsg,
+              [LoadingNoteAndClientId, Cmd<Msg>]
+            >(loadingNoteAndClientIdMsg)
+              .with(
+                { _tag: "ClientIdGenerated", clientId: P.select() },
+                (clientId) => [
+                  Lens.fromProp<LoadingNoteAndClientId>()("optionClientId").set(
                     option.some(clientId)
-                  ),
-                  initializeEditorIfPossible(stage)
-                )
-            )
-            .with({ _tag: "ComponentDidMount" }, () =>
-              pipe(
-                initializingNoteModel,
-                Lens.fromProp<InitializingNoteModel>()("didComponentMount").set(
-                  true
-                ),
-                initializeEditorIfPossible(stage)
+                  )(loadingNoteAndClientIdModel),
+                  cmd.none,
+                ]
               )
-            )
-            .with(
-              { _tag: "EditorWasInitialized" },
-              ({ editor, callbackManager }): [Model, Cmd<Msg>] =>
-                match<Option<string>, [Model, Cmd<Msg>]>(
-                  initializingNoteModel.optionClientId
-                )
-                  .with({ _tag: "Some", value: P.select() }, (clientId) => [
-                    {
-                      _tag: "InitializedNote",
-                      noteId: initializingNoteModel.noteId,
-                      creationTime: initializingNoteModel.creationTime,
-                      clientId,
-                      editor,
-                      callbackManager,
-                      areStepsInFlight: false,
+              .with(
+                { _tag: "VersionedNoteReceived", versionedNote: P.select() },
+                (versionedNote) => [
+                  Lens.fromProp<LoadingNoteAndClientId>()(
+                    "optionVersionedNote"
+                  ).set(option.some(versionedNote))(
+                    loadingNoteAndClientIdModel
+                  ),
+                  cmd.none,
+                ]
+              )
+              .exhaustive(),
+            tuple.mapFst((loadingNoteandClientIdModel_) =>
+              match<
+                LoadingNoteAndClientId,
+                LoadingNoteAndClientId | LoadingEditor
+              >(loadingNoteandClientIdModel_)
+                .with(
+                  {
+                    optionClientId: {
+                      _tag: "Some",
+                      value: P.select("clientId"),
                     },
-                    cmd.none,
-                  ])
-                  .with({ _tag: "None" }, () => [model, cmd.none])
-                  .exhaustive()
+                    optionVersionedNote: {
+                      _tag: "Some",
+                      value: P.select("versionedNote_"),
+                    },
+                  },
+                  ({ clientId, versionedNote_ }): LoadingEditor => ({
+                    _tag: "LoadingEditor",
+                    clientId,
+                    versionedNote: versionedNote_,
+                  })
+                )
+                .otherwise(() => loadingNoteandClientIdModel_)
             )
-            .exhaustive()
+          )
       )
       .with(
         [
           {
-            _tag: "GotInitializedNoteMsg",
-            msg: P.select("initializedNoteMsg"),
+            _tag: "GotLoadingEditorMsg",
+            msg: P.select("loadingEditorMsg"),
           },
-          P.select("initializedNoteModel", { _tag: "InitializedNote" }),
+          P.select("loadingEditorModel", { _tag: "LoadingEditor" }),
         ],
-        ({ initializedNoteMsg, initializedNoteModel }) =>
-          tuple.mapSnd<Cmd<InitializedNoteMsg>, Cmd<Msg>>(
+        ({ loadingEditorMsg, loadingEditorModel }) =>
+          tuple.mapSnd<Cmd<LoadingEditorMsg>, Cmd<Msg>>(
             cmd.map(
-              (initializedNoteMsg_): Msg => ({
-                _tag: "GotInitializedNoteMsg",
-                msg: initializedNoteMsg_,
+              (loadingEditorMsg_): Msg => ({
+                _tag: "GotLoadingEditorMsg",
+                msg: loadingEditorMsg_,
               })
             )
           )(
-            match<
-              InitializedNoteMsg,
-              [InitializedNoteModel, Cmd<InitializedNoteMsg>]
-            >(initializedNoteMsg)
+            match<LoadingEditorMsg, [Loaded, Cmd<LoadingEditorMsg>]>(
+              loadingEditorMsg
+            )
+              .with(
+                {
+                  _tag: "EditorLoaded",
+                  editor: P.select("editor"),
+                },
+                ({ editor }) => [
+                  {
+                    _tag: "Loaded",
+                    noteId: loadingEditorModel.versionedNote._id,
+                    creationTime:
+                      loadingEditorModel.versionedNote._creationTime,
+                    initialProseMirrorDoc:
+                      loadingEditorModel.versionedNote.proseMirrorDoc,
+                    initialVersion: loadingEditorModel.versionedNote.version,
+                    clientId: loadingEditorModel.clientId,
+                    editor,
+                    areStepsInFlight: false,
+                  },
+                  cmd.none,
+                ]
+              )
+              .exhaustive()
+          )
+      )
+      .with(
+        [
+          {
+            _tag: "GotLoadedMsg",
+            msg: P.select("loadedMsg"),
+          },
+          P.select("loadedModel", { _tag: "Loaded" }),
+        ],
+        ({ loadedMsg, loadedModel }) =>
+          tuple.mapSnd<Cmd<LoadedMsg>, Cmd<Msg>>(
+            cmd.map(
+              (loadedMsg): Msg => ({
+                _tag: "GotLoadedMsg",
+                msg: loadedMsg,
+              })
+            )
+          )(
+            match<LoadedMsg, [Loaded, Cmd<LoadedMsg>]>(loadedMsg)
               .with({ _tag: "EditorTransactionApplied" }, () =>
-                match<boolean, [InitializedNoteModel, Cmd<InitializedNoteMsg>]>(
-                  initializedNoteModel.areStepsInFlight
+                match<boolean, [Loaded, Cmd<LoadedMsg>]>(
+                  loadedModel.areStepsInFlight
                 )
-                  .with(true, () => [initializedNoteModel, cmd.none])
+                  .with(true, () => [loadedModel, cmd.none])
                   .with(false, () =>
                     match<
                       ReturnType<typeof collab.sendableSteps>,
-                      [InitializedNoteModel, Cmd<InitializedNoteMsg>]
-                    >(collab.sendableSteps(initializedNoteModel.editor.state))
-                      .with(null, () => [initializedNoteModel, cmd.none])
+                      [Loaded, Cmd<LoadedMsg>]
+                    >(collab.sendableSteps(loadedModel.editor.state))
+                      .with(null, () => [loadedModel, cmd.none])
                       .with(P.not(null), ({ version, steps }) => [
-                        Lens.fromProp<InitializedNoteModel>()(
-                          "areStepsInFlight"
-                        ).set(true)(initializedNoteModel),
-                        sendStepsCmd(
-                          convex,
-                          initializedNoteModel,
-                          version,
-                          steps
+                        Lens.fromProp<Loaded>()("areStepsInFlight").set(true)(
+                          loadedModel
                         ),
+                        sendSteps(convex, loadedModel, version, steps),
                       ])
                       .exhaustive()
                   )
@@ -231,29 +269,28 @@ export const update =
               .with({ _tag: "StepsSent" }, () =>
                 match<
                   ReturnType<typeof collab.sendableSteps>,
-                  [InitializedNoteModel, Cmd<InitializedNoteMsg>]
-                >(collab.sendableSteps(initializedNoteModel.editor.state))
+                  [Loaded, Cmd<LoadedMsg>]
+                >(collab.sendableSteps(loadedModel.editor.state))
                   .with(null, () => [
-                    Lens.fromProp<InitializedNoteModel>()(
-                      "areStepsInFlight"
-                    ).set(false)(initializedNoteModel),
+                    Lens.fromProp<Loaded>()("areStepsInFlight").set(false)(
+                      loadedModel
+                    ),
                     cmd.none,
                   ])
-                  .with(P.not(null), ({ version, steps }) => [
-                    Lens.fromProp<InitializedNoteModel>()(
-                      "areStepsInFlight"
-                    ).set(true)(initializedNoteModel),
-                    sendStepsCmd(convex, initializedNoteModel, version, steps),
-                  ])
+                  .with(P.not(null), ({ version, steps }) => {
+                    console.log("true sendable");
+                    return [
+                      Lens.fromProp<Loaded>()("areStepsInFlight").set(true)(
+                        loadedModel
+                      ),
+                      sendSteps(convex, loadedModel, version, steps),
+                    ];
+                  })
                   .exhaustive()
               )
-              .with({ _tag: "ReceivedSteps" }, ({ steps }) => [
-                initializedNoteModel,
-                receiveTransactionCmd(initializedNoteModel.editor, steps),
-              ])
-              .with({ _tag: "ComponentWillUnmount" }, () => [
-                initializedNoteModel,
-                destroyEditorCmd(initializedNoteModel.editor),
+              .with({ _tag: "StepsReceived" }, ({ steps }) => [
+                loadedModel,
+                receiveSteps(loadedModel.editor, steps),
               ])
               .exhaustive()
           )
@@ -265,8 +302,8 @@ export const update =
         ),
       ]);
 
-const receiveTransactionCmd: (
-  editor: TiptapEditor,
+const receiveSteps: (
+  editor: Editor,
   steps: NonEmptyArray<{ proseMirrorStep: string; clientId: string }>
 ) => Cmd<never> = (editor, steps_) => {
   const { steps, clientIds } = nonEmptyArray.reduce<
@@ -291,147 +328,17 @@ const receiveTransactionCmd: (
   );
 };
 
-const destroyEditorCmd = (editor: TiptapEditor): Cmd<never> =>
-  pipe(() => editor.destroy(), cmdExtra.fromIOVoid);
-
-const initializeEditorIfPossible =
-  (stage: Stage) =>
-  (
-    initializingNoteModel: InitializingNoteModel
-  ): [InitializingNoteModel, Cmd<Msg>] =>
-    pipe(
-      initializingNoteModel,
-      initializeEditor(stage),
-      option.match(
-        () => [initializingNoteModel, cmd.none],
-        tuple.mapSnd(
-          cmd.map(
-            (initializingNoteMsg_: InitializingNoteMsg): Msg => ({
-              _tag: "GotInitializingNoteMsg",
-              msg: initializingNoteMsg_,
-            })
-          )
-        )
-      )
-    );
-
-const initializeEditor =
-  (stage: Stage) =>
-  (
-    initializingNoteModel: InitializingNoteModel
-  ): Option<[InitializingNoteModel, Cmd<InitializingNoteMsg>]> =>
-    match<
-      InitializingNoteModel,
-      Option<[InitializingNoteModel, Cmd<InitializingNoteMsg>]>
-    >(initializingNoteModel)
-      .with(
-        {
-          optionClientId: { _tag: "Some", value: P.select("clientId") },
-          didComponentMount: true,
-        },
-        ({ clientId }) =>
-          option.some([
-            initializingNoteModel,
-            initializeEditorCmd({
-              stage,
-              clientId,
-              proseMirrorDoc: initializingNoteModel.proseMirrorDoc,
-              version: initializingNoteModel.version,
-            }),
-          ])
-      )
-      .otherwise(() => option.none);
-
-const initializeEditorCmd = ({
-  stage,
-  clientId,
-  proseMirrorDoc,
-  version,
-}: {
-  stage: Stage;
-  clientId: string;
-  proseMirrorDoc: string;
-  version: number;
-}): Cmd<InitializingNoteMsg> =>
-  pipe(
-    () => document.getElementById(editorId(clientId)),
-    cmdExtra.fromIO,
-    cmdExtra.chain(
-      flow(
-        option.fromNullable,
-        option.match(
-          () =>
-            logMessage.report(stage)(
-              logMessage.error("Failed to find editor element by HTML ID")
-            ),
-          (htmlElement) =>
-            pipe((): InitializingNoteMsg => {
-              const callbackInterop: CallbackInterop<Msg> =
-                callbackManager.manageCallbacks<Msg>()();
-
-              // I measured this manually in Chrome. This is obviously brittle, but also probably good enough for now.
-              const scrollBounds = { top: 48, bottom: 90, left: 0, right: 0 };
-
-              const editor: TiptapEditor = new TiptapEditor({
-                editorProps: {
-                  attributes: {
-                    class:
-                      "py-4 px-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition",
-                  },
-                  scrollMargin: {
-                    ...scrollBounds,
-                    top: scrollBounds.top + 32,
-                    bottom: scrollBounds.bottom + 32,
-                  },
-                  scrollThreshold: scrollBounds,
-                },
-                element: htmlElement,
-                // eslint-disable-next-line no-type-assertion/no-type-assertion
-                content: JSON.parse(proseMirrorDoc) as string,
-                extensions: [
-                  ...extensions,
-                  Placeholder.configure({
-                    placeholder: "Write something…",
-                    emptyNodeClass:
-                      "first:before:h-0 first:before:text-stone-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none",
-                  }),
-                  Extension.create({
-                    addProseMirrorPlugins: () => [
-                      collab.collab({ version, clientID: clientId }),
-                    ],
-                  }),
-                ],
-                onTransaction: () => {
-                  callbackInterop.dispatch({
-                    _tag: "GotInitializedNoteMsg",
-                    msg: {
-                      _tag: "EditorTransactionApplied",
-                    },
-                  })();
-                },
-              });
-              return {
-                _tag: "EditorWasInitialized",
-                editor,
-                callbackManager: callbackInterop.callbackManager,
-              };
-            }, cmdExtra.fromIO)
-        )
-      )
-    )
-  );
-
-const sendStepsCmd = (
+const sendSteps = (
   convex: ConvexReactClient<API>,
-  initializedNoteModel: InitializedNoteModel,
+  loadedModel: Loaded,
   version: number,
   steps: ReadonlyArray<Step>
-): Cmd<InitializedNoteMsg> =>
+): Cmd<LoadedMsg> =>
   runMutation(
     convex.mutation("sendSteps"),
-    () => option.some<InitializedNoteMsg>({ _tag: "StepsSent" }),
-    initializedNoteModel.noteId,
-    initializedNoteModel.clientId,
+    () => option.some<LoadedMsg>({ _tag: "StepsSent" }),
+    loadedModel.noteId,
+    loadedModel.clientId,
     version,
     readonlyArray
       .toArray(steps)
@@ -444,99 +351,191 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
   (currentTime) => (model) => (dispatch) =>
     match(model)
       .with(
-        { _tag: "InitializingNote" },
-        ({ optionClientId, noteId, creationTime, version }) =>
-          match(optionClientId)
-            .with({ _tag: "Some", value: P.select() }, (clientId) => (
-              <Editor
-                dispatch={dispatch}
-                currentTime={currentTime}
-                noteId={noteId}
-                creationTime={creationTime}
-                clientId={clientId}
-                version={version}
-              />
-            ))
-            .with({ _tag: "None" }, () => <></>)
-            .exhaustive()
-      )
-      .with(
-        { _tag: "InitializedNote" },
-        ({ noteId, creationTime, clientId, editor }) => (
-          <Editor
-            dispatch={dispatch}
-            currentTime={currentTime}
-            creationTime={creationTime}
-            noteId={noteId}
-            clientId={clientId}
-            version={collab.getVersion(editor.state)}
-          />
+        { _tag: "LoadingNoteAndClientId", noteId: P.select() },
+        (noteId) => (
+          <LoadingNoteAndClientId dispatch={dispatch} noteId={noteId} />
         )
       )
+      .with({ _tag: "LoadingEditor" }, { _tag: "Loaded" }, (model_) => (
+        <Editor_
+          {...match<LoadingEditor | Loaded, Parameters<typeof Editor_>[0]>(
+            model_
+          )
+            .with(
+              { _tag: "LoadingEditor" },
+              ({ versionedNote, clientId }): Parameters<typeof Editor_>[0] => ({
+                dispatch,
+                currentTime,
+                noteId: versionedNote._id,
+                creationTime: versionedNote._creationTime,
+                initialProseMirrorDoc: versionedNote.proseMirrorDoc,
+                initialVersion: versionedNote.version,
+                clientId: clientId,
+              })
+            )
+            .with(
+              { _tag: "Loaded" },
+              ({
+                noteId,
+                clientId,
+                creationTime,
+                initialProseMirrorDoc,
+                initialVersion,
+              }): Parameters<typeof Editor_>[0] => ({
+                dispatch,
+                currentTime,
+                noteId,
+                creationTime,
+                initialProseMirrorDoc,
+                initialVersion,
+                clientId,
+              })
+            )
+            .exhaustive()}
+        />
+      ))
       .exhaustive();
 
-const Editor = ({
+const LoadingNoteAndClientId = ({
+  dispatch,
+  noteId,
+}: {
+  dispatch: Dispatch<Msg>;
+  noteId: Id<"notes">;
+}) => {
+  const optionVersionedNote = option.fromNullable(
+    useQuery("getVersionedNote", noteId)
+  );
+
+  useStableEffect(
+    () => {
+      match(optionVersionedNote)
+        .with({ _tag: "None" }, constVoid)
+        .with({ _tag: "Some", value: P.select() }, (versionedNote_) =>
+          dispatch({
+            _tag: "GotLoadingNoteAndClientIdMsg",
+            msg: {
+              _tag: "VersionedNoteReceived",
+              versionedNote: versionedNote_,
+            },
+          })
+        )
+        .exhaustive();
+    },
+    [optionVersionedNote],
+    eq.tuple(option.getEq(versionedNote.Eq))
+  );
+
+  return null;
+};
+
+// TODO: Split this into two components, one for each Model variant.
+const Editor_ = ({
   dispatch,
   currentTime,
   noteId,
   creationTime,
+  initialProseMirrorDoc,
+  initialVersion,
   clientId,
-  version,
 }: {
   dispatch: Dispatch<Msg>;
   currentTime: number;
   noteId: Id<"notes">;
   creationTime: number;
+  initialProseMirrorDoc: string;
+  initialVersion: number;
   clientId: string;
-  version: number;
 }): ReactElement => {
-  const stepsSince = useQuery("getStepsSince", noteId, version);
+  // I measured this manually in Chrome. This is obviously brittle, but also probably good enough for now.
+  const scrollBounds = { top: 48, bottom: 90, left: 0, right: 0 };
+
+  const editor = useEditor({
+    editorProps: {
+      attributes: {
+        class:
+          "py-4 px-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition",
+      },
+      scrollMargin: {
+        ...scrollBounds,
+        top: scrollBounds.top + 32,
+        bottom: scrollBounds.bottom + 32,
+      },
+      scrollThreshold: scrollBounds,
+    },
+    // eslint-disable-next-line no-type-assertion/no-type-assertion
+    content: JSON.parse(initialProseMirrorDoc) as string,
+    extensions: [
+      ...extensions,
+      Placeholder.configure({
+        placeholder: "Write something…",
+        emptyEditorClass:
+          "first:before:h-0 first:before:text-stone-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none",
+      }),
+      Extension.create({
+        addProseMirrorPlugins: () => [
+          collab.collab({ version: initialVersion, clientID: clientId }),
+        ],
+      }),
+    ],
+    onCreate: ({ editor: editor_ }) => {
+      dispatch({
+        _tag: "GotLoadingEditorMsg",
+        msg: {
+          _tag: "EditorLoaded",
+          editor: editor_,
+        },
+      });
+    },
+    onTransaction: () => {
+      dispatch({
+        _tag: "GotLoadedMsg",
+        msg: {
+          _tag: "EditorTransactionApplied",
+        },
+      });
+    },
+  });
+
+  const currentVersion = match(option.fromNullable(editor))
+    .with({ _tag: "Some", value: P.select() }, (editor_) =>
+      collab.getVersion(editor_.state)
+    )
+    .with({ _tag: "None" }, () => initialVersion)
+    .exhaustive();
+
+  const stepsSince = useQuery("getStepsSince", noteId, currentVersion);
 
   React.useEffect(() => {
     pipe(
       stepsSince,
       option.fromNullable,
       option.match(
-        () => constVoid,
+        constVoid,
         flow(
           nonEmptyArray.fromArray,
           option.map(
             (steps): Msg => ({
-              _tag: "GotInitializedNoteMsg",
+              _tag: "GotLoadedMsg",
               msg: {
-                _tag: "ReceivedSteps",
+                _tag: "StepsReceived",
                 steps,
               },
             })
           ),
-          option.match(
-            () => constVoid,
-            (msg) => () => dispatch(msg)
-          )
+          option.match(constVoid, (msg) => dispatch(msg))
         )
       )
-    )();
+    );
   }, [stepsSince, dispatch]);
-
-  React.useEffect(() => {
-    dispatch({
-      _tag: "GotInitializingNoteMsg",
-      msg: { _tag: "ComponentDidMount" },
-    });
-
-    return dispatch({
-      _tag: "GotInitializedNoteMsg",
-      msg: { _tag: "ComponentWillUnmount" },
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const creationDateTime = DateTime.fromMillis(creationTime);
 
   const relativeFormattedCreationTime = match<boolean, string>(
     DateTime.fromMillis(currentTime).diff(creationDateTime).as("minutes") < 1
   )
-    .with(true, () => "less than a minute ago")
-    .with(false, () => creationDateTime.toRelative() || "")
+    .with(true, () => "a few seconds ago")
+    .with(false, () => creationDateTime.toRelative() || "") // TODO: When can this be null?
     .exhaustive();
 
   const absoluteFormattedCreationTime: string = creationDateTime.toLocaleString(
@@ -552,23 +551,15 @@ const Editor = ({
 
   return (
     <div className="flex flex-col gap-y-4">
-      <div className="text-stone-500 border-b-2 border-stone-300">
-        <span className="float-left">{relativeFormattedCreationTime}</span>
-        <span className="float-right">{absoluteFormattedCreationTime}</span>
+      <div className="flex justify-between text-stone-500 border-b-2 border-stone-300">
+        <span>{relativeFormattedCreationTime}</span>
+        <span>{absoluteFormattedCreationTime}</span>
       </div>
-      <div id={editorId(clientId)} />
+      <EditorContent editor={editor} />
     </div>
   );
 };
 
-const editorId = (clientId: string): string => `editor-${clientId}`;
-
 // SUBSCRIPTIONS
 
-export const subscriptions: (model: Model) => Sub<Msg> = (model) =>
-  match<Model, Sub<Msg>>(model)
-    .with({ _tag: "InitializedNote" }, (initializedNoteModel) =>
-      callbackManager.subscriptions(initializedNoteModel.callbackManager)
-    )
-    .with({ _tag: "InitializingNote" }, () => sub.none)
-    .exhaustive();
+export const subscriptions: (model: Model) => Sub<Msg> = () => sub.none;

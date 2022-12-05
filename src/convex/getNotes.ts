@@ -1,52 +1,25 @@
-import type { Document, Id } from "./_generated/dataModel";
+import type { PaginationOptions, PaginationResult } from "convex/server";
+
+import type { Id } from "./_generated/dataModel";
 import { query } from "./_generated/server";
-import getNoteVersion from "./getNoteVersion";
 
 export default query(
-  async ({
-    db,
-    auth,
-  }): Promise<
-    Map<
-      Id<"notes">,
-      {
-        proseMirrorDoc: Document<"notes">["proseMirrorDoc"];
-        creationTime: number;
-        version: number;
-      }
-    >
-  > =>
+  async (
+    { db, auth },
+    opts: PaginationOptions
+  ): Promise<PaginationResult<Id<"notes">>> =>
     auth.getUserIdentity().then(async (userIdentity) => {
       if (userIdentity) {
         return db
           .query("notes")
-          .order("desc")
+          .order("asc")
           .filter((q) => q.eq(q.field("owner"), userIdentity.tokenIdentifier))
-          .take(10)
-          .then((notes) =>
-            notes.reduce(
-              async (resultPromise, note) =>
-                resultPromise.then((result) =>
-                  getNoteVersion(db, note._id).then((version) =>
-                    result.set(note._id, {
-                      proseMirrorDoc: note.proseMirrorDoc,
-                      creationTime: note._creationTime,
-                      version,
-                    })
-                  )
-                ),
-              Promise.resolve(
-                new Map<
-                  Id<"notes">,
-                  {
-                    proseMirrorDoc: Document<"notes">["proseMirrorDoc"];
-                    creationTime: number;
-                    version: number;
-                  }
-                >()
-              )
-            )
-          );
+          .paginate(opts)
+          .then((notesPaginationResult) => ({
+            page: notesPaginationResult.page.map((note) => note._id),
+            isDone: notesPaginationResult.isDone,
+            continueCursor: notesPaginationResult.continueCursor,
+          }));
       } else {
         throw "Not authenticated";
       }
