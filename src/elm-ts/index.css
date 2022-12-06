@@ -1,6 +1,11 @@
 @tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@layer base {
+.ProseMirror {
+  > *:first-child {
+    @apply mt-4;
+  }
   h1 {
     @apply text-3xl font-extrabold mt-8 mb-5;
   }
@@ -103,15 +108,7 @@
   button {
     @apply select-none;
   }
+  a {
+    @apply text-yellow-600 hover:text-yellow-50 hover:bg-yellow-600 cursor-pointer rounded-sm underline transition duration-75;
+  }
 }
-
-.ProseMirror > *:first-child {
-  @apply mt-4;
-}
-
-.ProseMirror a {
-  @apply text-yellow-600 hover:text-yellow-50 hover:bg-yellow-600 cursor-pointer rounded-sm underline transition duration-75;
-}
-
-@tailwind components;
-@tailwind utilities;

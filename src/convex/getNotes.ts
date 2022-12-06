@@ -12,7 +12,7 @@ export default query(
       if (userIdentity) {
         return db
           .query("notes")
-          .order("asc")
+          .order("desc")
           .filter((q) => q.eq(q.field("owner"), userIdentity.tokenIdentifier))
           .paginate(opts)
           .then((notesPaginationResult) => ({

@@ -34,22 +34,25 @@ import type { Stage } from "./stage";
 
 // MODEL
 
-export type Model = LoadingNoteAndClientId | LoadingEditor | Loaded;
+export type Model =
+  | LoadingNoteAndClientIdModel
+  | LoadingEditorModel
+  | LoadedModel;
 
-type LoadingNoteAndClientId = {
+type LoadingNoteAndClientIdModel = {
   _tag: "LoadingNoteAndClientId";
   noteId: Id<"notes">;
   optionVersionedNote: Option<VersionedNote>;
   optionClientId: Option<string>;
 };
 
-type LoadingEditor = {
+type LoadingEditorModel = {
   _tag: "LoadingEditor";
   versionedNote: VersionedNote;
   clientId: string;
 };
 
-type Loaded = {
+type LoadedModel = {
   _tag: "Loaded";
   noteId: Id<"notes">;
   creationTime: number;
@@ -134,21 +137,21 @@ export const update =
           pipe(
             match<
               LoadingNoteAndClientIdMsg,
-              [LoadingNoteAndClientId, Cmd<Msg>]
+              [LoadingNoteAndClientIdModel, Cmd<Msg>]
             >(loadingNoteAndClientIdMsg)
               .with(
                 { _tag: "ClientIdGenerated", clientId: P.select() },
                 (clientId) => [
-                  Lens.fromProp<LoadingNoteAndClientId>()("optionClientId").set(
-                    option.some(clientId)
-                  )(loadingNoteAndClientIdModel),
+                  Lens.fromProp<LoadingNoteAndClientIdModel>()(
+                    "optionClientId"
+                  ).set(option.some(clientId))(loadingNoteAndClientIdModel),
                   cmd.none,
                 ]
               )
               .with(
                 { _tag: "VersionedNoteReceived", versionedNote: P.select() },
                 (versionedNote) => [
-                  Lens.fromProp<LoadingNoteAndClientId>()(
+                  Lens.fromProp<LoadingNoteAndClientIdModel>()(
                     "optionVersionedNote"
                   ).set(option.some(versionedNote))(
                     loadingNoteAndClientIdModel
@@ -159,8 +162,8 @@ export const update =
               .exhaustive(),
             tuple.mapFst((loadingNoteandClientIdModel_) =>
               match<
-                LoadingNoteAndClientId,
-                LoadingNoteAndClientId | LoadingEditor
+                LoadingNoteAndClientIdModel,
+                LoadingNoteAndClientIdModel | LoadingEditorModel
               >(loadingNoteandClientIdModel_)
                 .with(
                   {
@@ -173,7 +176,7 @@ export const update =
                       value: P.select("versionedNote_"),
                     },
                   },
-                  ({ clientId, versionedNote_ }): LoadingEditor => ({
+                  ({ clientId, versionedNote_ }): LoadingEditorModel => ({
                     _tag: "LoadingEditor",
                     clientId,
                     versionedNote: versionedNote_,
@@ -200,7 +203,7 @@ export const update =
               })
             )
           )(
-            match<LoadingEditorMsg, [Loaded, Cmd<LoadingEditorMsg>]>(
+            match<LoadingEditorMsg, [LoadedModel, Cmd<LoadingEditorMsg>]>(
               loadingEditorMsg
             )
               .with(
@@ -244,22 +247,22 @@ export const update =
               })
             )
           )(
-            match<LoadedMsg, [Loaded, Cmd<LoadedMsg>]>(loadedMsg)
+            match<LoadedMsg, [LoadedModel, Cmd<LoadedMsg>]>(loadedMsg)
               .with({ _tag: "EditorTransactionApplied" }, () =>
-                match<boolean, [Loaded, Cmd<LoadedMsg>]>(
+                match<boolean, [LoadedModel, Cmd<LoadedMsg>]>(
                   loadedModel.areStepsInFlight
                 )
                   .with(true, () => [loadedModel, cmd.none])
                   .with(false, () =>
                     match<
                       ReturnType<typeof collab.sendableSteps>,
-                      [Loaded, Cmd<LoadedMsg>]
+                      [LoadedModel, Cmd<LoadedMsg>]
                     >(collab.sendableSteps(loadedModel.editor.state))
                       .with(null, () => [loadedModel, cmd.none])
                       .with(P.not(null), ({ version, steps }) => [
-                        Lens.fromProp<Loaded>()("areStepsInFlight").set(true)(
-                          loadedModel
-                        ),
+                        Lens.fromProp<LoadedModel>()("areStepsInFlight").set(
+                          true
+                        )(loadedModel),
                         sendSteps(convex, loadedModel, version, steps),
                       ])
                       .exhaustive()
@@ -269,10 +272,10 @@ export const update =
               .with({ _tag: "StepsSent" }, () =>
                 match<
                   ReturnType<typeof collab.sendableSteps>,
-                  [Loaded, Cmd<LoadedMsg>]
+                  [LoadedModel, Cmd<LoadedMsg>]
                 >(collab.sendableSteps(loadedModel.editor.state))
                   .with(null, () => [
-                    Lens.fromProp<Loaded>()("areStepsInFlight").set(false)(
+                    Lens.fromProp<LoadedModel>()("areStepsInFlight").set(false)(
                       loadedModel
                     ),
                     cmd.none,
@@ -280,9 +283,9 @@ export const update =
                   .with(P.not(null), ({ version, steps }) => {
                     console.log("true sendable");
                     return [
-                      Lens.fromProp<Loaded>()("areStepsInFlight").set(true)(
-                        loadedModel
-                      ),
+                      Lens.fromProp<LoadedModel>()("areStepsInFlight").set(
+                        true
+                      )(loadedModel),
                       sendSteps(convex, loadedModel, version, steps),
                     ];
                   })
@@ -330,7 +333,7 @@ const receiveSteps: (
 
 const sendSteps = (
   convex: ConvexReactClient<API>,
-  loadedModel: Loaded,
+  loadedModel: LoadedModel,
   version: number,
   steps: ReadonlyArray<Step>
 ): Cmd<LoadedMsg> =>
@@ -358,9 +361,10 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
       )
       .with({ _tag: "LoadingEditor" }, { _tag: "Loaded" }, (model_) => (
         <Editor_
-          {...match<LoadingEditor | Loaded, Parameters<typeof Editor_>[0]>(
-            model_
-          )
+          {...match<
+            LoadingEditorModel | LoadedModel,
+            Parameters<typeof Editor_>[0]
+          >(model_)
             .with(
               { _tag: "LoadingEditor" },
               ({ versionedNote, clientId }): Parameters<typeof Editor_>[0] => ({
@@ -478,7 +482,7 @@ const Editor_ = ({
         ],
       }),
     ],
-    onCreate: ({ editor: editor_ }) => {
+    onBeforeCreate: ({ editor: editor_ }) => {
       dispatch({
         _tag: "GotLoadingEditorMsg",
         msg: {

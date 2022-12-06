@@ -55,7 +55,7 @@ export const init: (
     )
   );
 
-// Prevent Flash Of Unstyled Text (FOUT), which can cause the scroll position to be wrong when it happens after notes have loaded and the page has been scrolled to the bottom.
+// Prevent Flash Of Unstyled Text (FOUT), which can cause a layout shift.
 // Reference: https://dev.to/fyfirman/how-to-fix-fout-flash-of-unstyled-text-in-react-1dl1
 const loadFontsAndNotifyWhenLoaded: Cmd<Msg> = cmdExtra.fromTask(() =>
   Promise.all([

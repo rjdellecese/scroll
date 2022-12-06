@@ -1,4 +1,3 @@
-import { UserButton } from "@clerk/clerk-react";
 import type { ConvexReactClient } from "convex/react";
 import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
@@ -101,26 +100,13 @@ export const view =
         { _tag: "Home", model: P.select() },
         flow(
           home.view(currentTime),
-          html.map((homeMsg): Msg => ({ _tag: "GotHomeMsg", msg: homeMsg })),
-          layoutView
+          html.map((homeMsg): Msg => ({ _tag: "GotHomeMsg", msg: homeMsg }))
         )
       )
       .with({ _tag: "SignIn" }, () => signIn.view)
       .with({ _tag: "SignUp" }, () => signUp.view)
       .with({ _tag: "NotFound" }, () => notFoundView)
       .exhaustive();
-
-const layoutView =
-  (page: Html<Msg>): Html<Msg> =>
-  (dispatch) =>
-    (
-      <div>
-        <div className="sticky top-0 h-12 z-50 px-4 py-2 flex flex-row content-center justify-end shadow-md shadow-stone-400/30 bg-stone-50">
-          <UserButton appearance={{ elements: { rootBox: "self-center" } }} />
-        </div>
-        {page(dispatch)}
-      </div>
-    );
 
 const notFoundView: Html<Msg> = () => <div>Page not found!</div>;
 
