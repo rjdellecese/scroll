@@ -461,7 +461,7 @@ const Editor_ = ({
   const editor = useEditor({
     editorProps: {
       attributes: {
-        class: "px-8 py-4 focus:outline-none",
+        class: "px-8 pt-4 pb-12 focus:outline-none",
       },
       scrollMargin: {
         ...scrollBounds,
