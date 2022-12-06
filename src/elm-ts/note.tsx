@@ -1,7 +1,6 @@
-import type { Editor } from "@tiptap/core";
-import { Extension } from "@tiptap/core";
+import { Editor, Extension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { Editor as ReactEditor, EditorContent, useEditor } from "@tiptap/react";
 import type { ConvexReactClient } from "convex/react";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
@@ -11,12 +10,15 @@ import { eq, io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
 import { constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
-import { useStableEffect } from "fp-ts-react-stable-hooks";
+import {
+  useStableEffect,
+  useStableLayoutEffect,
+} from "fp-ts-react-stable-hooks";
 import { DateTime } from "luxon";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
-import type { Dispatch, ReactElement } from "react";
+import { Dispatch, ReactElement, useRef } from "react";
 import React from "react";
 import { match, P } from "ts-pattern";
 
@@ -59,7 +61,7 @@ type LoadedModel = {
   initialProseMirrorDoc: string;
   initialVersion: number;
   clientId: string;
-  editor: Editor;
+  editor: ReactEditor;
   areStepsInFlight: boolean;
 };
 
@@ -306,7 +308,7 @@ export const update =
       ]);
 
 const receiveSteps: (
-  editor: Editor,
+  editor: ReactEditor,
   steps: NonEmptyArray<{ proseMirrorStep: string; clientId: string }>
 ) => Cmd<never> = (editor, steps_) => {
   const { steps, clientIds } = nonEmptyArray.reduce<
@@ -452,18 +454,17 @@ const Editor_ = ({
   clientId: string;
 }): ReactElement => {
   // I measured this manually in Chrome. This is obviously brittle, but also probably good enough for now.
-  const scrollBounds = { top: 48, bottom: 90, left: 0, right: 0 };
+  const scrollBounds = { top: 48, bottom: 96, left: 0, right: 0 };
 
   const editor = useEditor({
     editorProps: {
       attributes: {
-        class:
-          "py-4 px-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition",
+        class: "px-8 py-4 focus:outline-none",
       },
       scrollMargin: {
         ...scrollBounds,
-        top: scrollBounds.top + 32,
-        bottom: scrollBounds.bottom + 32,
+        top: scrollBounds.top + 42,
+        bottom: scrollBounds.bottom + 42,
       },
       scrollThreshold: scrollBounds,
     },
@@ -533,6 +534,44 @@ const Editor_ = ({
     );
   }, [stepsSince, dispatch]);
 
+  return editor ? (
+    <LoadedEditor
+      currentTime={currentTime}
+      creationTime={creationTime}
+      editor={editor}
+    />
+  ) : (
+    <></>
+  );
+};
+
+const LoadedEditor = ({
+  currentTime,
+  creationTime,
+  editor,
+}: {
+  currentTime: number;
+  creationTime: number;
+  editor: ReactEditor;
+}) => {
+  const ref: React.Ref<HTMLDivElement> = useRef(null);
+
+  // TODO: Only scroll down if note is in or above viewport
+  useStableLayoutEffect(
+    () => {
+      // TODO
+      match(option.fromNullable(ref.current))
+        .with(
+          { _tag: "Some", value: P.select() },
+          (value) => window.scrollBy({ top: value.offsetHeight + 32 }) // NOTE: We need to add the column gap
+        )
+        .with({ _tag: "None" }, constVoid)
+        .exhaustive();
+    },
+    [],
+    eq.tuple()
+  );
+
   const creationDateTime = DateTime.fromMillis(creationTime);
 
   const relativeFormattedCreationTime = match<boolean, string>(
@@ -554,8 +593,8 @@ const Editor_ = ({
   );
 
   return (
-    <div className="flex flex-col gap-y-4">
-      <div className="flex justify-between text-stone-500 border-b-2 border-stone-300">
+    <div ref={ref} className="flex flex-col gap-y-4">
+      <div className="flex justify-between sticky top-12 font-light text-stone-500 bg-white z-10 border-b border-stone-300">
         <span>{relativeFormattedCreationTime}</span>
         <span>{absoluteFormattedCreationTime}</span>
       </div>

@@ -105,10 +105,11 @@
   hr {
     @apply border-t-2 border-stone-300;
   }
-  button {
-    @apply select-none;
-  }
   a {
     @apply text-yellow-600 hover:text-yellow-50 hover:bg-yellow-600 cursor-pointer rounded-sm underline transition duration-75;
   }
+}
+
+button {
+  @apply select-none;
 }

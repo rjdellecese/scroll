@@ -1,11 +1,12 @@
-import type { ReactElement } from "react";
+import type { ReactElement, SVGProps } from "react";
 import React from "react";
 
-export const LoadingSpinner = (
-  props: { className?: string } = { className: "" }
-): ReactElement => (
+type Props = SVGProps<SVGSVGElement>;
+
+export const LoadingSpinner = (props: Props): ReactElement => (
   <svg
-    className={`animate-spin -ml-1 mr-3 h-5 w-5 ${props.className}`}
+    {...props}
+    className={`animate-spin -ml-1 mr-3 h-5 w-5 ${props.className || ""}`}
     xmlns="http://www.w3.org/2000/svg"
     fill="none"
     viewBox="0 0 24 24"

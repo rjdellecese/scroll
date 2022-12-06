@@ -5,9 +5,21 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { array, either, eq, option, readonlyArray, tuple } from "fp-ts";
-import { apply, constVoid, flow, identity, pipe } from "fp-ts/function";
+import {
+  apply,
+  constant,
+  constNull,
+  constVoid,
+  flow,
+  identity,
+  pipe,
+} from "fp-ts/function";
 import type { Either } from "fp-ts/lib/Either";
-import { useStableEffect } from "fp-ts-react-stable-hooks";
+import { Option } from "fp-ts/lib/Option";
+import {
+  useStableEffect,
+  useStableLayoutEffect,
+} from "fp-ts-react-stable-hooks";
 import { Lens } from "monocle-ts";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
@@ -36,7 +48,8 @@ type LoadingNotesModel = { _tag: "LoadingNotes" };
 type LoadedNotesModel = {
   _tag: "LoadedNotes";
   noteModels: note.Model[];
-  loadMore: Cmd<Msg>;
+  loadMore: Option<Cmd<Msg>>;
+  isTopInView: boolean;
 };
 
 export const init: Model = {
@@ -48,9 +61,10 @@ export const init: Model = {
 export type Msg =
   | { _tag: "CreateNoteButtonClicked" }
   | {
+      // TODO: Change name to "GetNotesResultChanged" or something
       _tag: "GotNotes";
       noteIds: Id<"notes">[];
-      loadMore: Cmd<Msg>;
+      loadMore: Option<Cmd<Msg>>;
     }
   | {
       _tag: "GotUnexpectedPaginationState";
@@ -212,7 +226,15 @@ export const update =
         ],
         ({ isInView, loadedNotesModel }) =>
           match<boolean, [Model, Cmd<Msg>]>(isInView)
-            .with(true, () => [model, loadedNotesModel.loadMore])
+            .with(true, () => [
+              Lens.fromProp<LoadedNotesModel>()("isTopInView").set(isInView)(
+                loadedNotesModel
+              ),
+              option.match<Cmd<Msg>, Cmd<Msg>>(
+                () => cmd.none,
+                identity
+              )(loadedNotesModel.loadMore),
+            ])
             .with(false, () => [model, cmd.none])
             .exhaustive()
       )
@@ -361,15 +383,11 @@ const View = ({
             dispatch({
               _tag: "GotNotes",
               noteIds,
-              loadMore: cmdExtra.fromIOVoid(
-                pipe(
-                  loadMore,
-                  option.fromNullable,
-                  option.match(
-                    () => constVoid,
-                    (loadMore_: (numItems: number) => void) => () =>
-                      loadMore_(5)
-                  )
+              loadMore: pipe(
+                loadMore,
+                option.fromNullable,
+                option.map((loadMore_: (numItems: number) => void) =>
+                  cmdExtra.fromIOVoid(() => loadMore_(5))
                 )
               ),
             })
@@ -389,17 +407,20 @@ const View = ({
         <div className="flex flex-col grow justify-end max-w-3xl w-full mt-6">
           {match<Model, Html<Msg>>(model)
             .with({ _tag: "LoadingNotes" }, () => loadingNotes)
-            .with(
-              { _tag: "LoadedNotes", noteModels: P.select() },
-              (noteModels) =>
-                pipe(
-                  noteModels,
-                  array.last,
-                  option.match(
-                    () => noNotes,
-                    () => loadedNotes(currentTime, noteModels)
-                  )
+            .with({ _tag: "LoadedNotes" }, ({ noteModels, loadMore }) =>
+              pipe(
+                noteModels,
+                array.last,
+                option.match(
+                  () => noNotes,
+                  () =>
+                    loadedNotes({
+                      currentTime,
+                      noteModels,
+                      canLoadMore: option.isSome(loadMore),
+                    })
                 )
+              )
             )
             .exhaustive()(dispatch)}
         </div>
@@ -416,47 +437,67 @@ const loadingNotes: Html<Msg> = () => (
   <LoadingSpinner className="place-self-center m-8" />
 );
 
-const loadedNotes: (
-  currentTime: number,
-  noteModels: note.Model[]
-) => Html<Msg> = (currentTime, noteModels) => (dispatch) =>
-  (
-    <>
-      <div className="flex flex-col gap-y-8">
-        <InView
-          onChange={(isInView) =>
-            dispatch({ _tag: "InViewStatusChanged", isInView })
-          }
-        >
-          {({ ref }) => <div ref={ref}></div>}
-        </InView>
-        {pipe(
-          noteModels,
-          array.map((noteModel) => (
-            <React.Fragment key={note.noteId(noteModel).toString()}>
-              {pipe(
-                noteModel,
-                note.view(currentTime),
-                html.map(
-                  (noteMsg): Msg => ({
-                    _tag: "GotNoteMsg",
-                    noteId: note.noteId(noteModel),
-                    msg: noteMsg,
-                  })
-                ),
-                apply(dispatch)
-              )}
-            </React.Fragment>
-          ))
-        )}
-      </div>
-    </>
-  );
+const loadedNotes: ({
+  currentTime,
+  noteModels,
+  canLoadMore,
+}: {
+  currentTime: number;
+  noteModels: note.Model[];
+  canLoadMore: boolean;
+}) => Html<Msg> =
+  ({ currentTime, noteModels, canLoadMore }) =>
+  (dispatch) =>
+    (
+      <>
+        <div className="flex flex-col gap-y-8">
+          <InView
+            onChange={(isInView) =>
+              dispatch({ _tag: "InViewStatusChanged", isInView })
+            }
+          >
+            {({ ref }) =>
+              match(canLoadMore)
+                .with(true, () => (
+                  <div ref={ref} className="flex place-content-center">
+                    <LoadingSpinner />
+                  </div>
+                ))
+                .with(false, () => (
+                  <div className="text-stone-400 place-self-center">
+                    You've reached the beginning!
+                  </div>
+                ))
+                .exhaustive()
+            }
+          </InView>
+          {pipe(
+            noteModels,
+            array.map((noteModel) => (
+              <React.Fragment key={note.noteId(noteModel).toString()}>
+                {pipe(
+                  noteModel,
+                  note.view(currentTime),
+                  html.map(
+                    (noteMsg): Msg => ({
+                      _tag: "GotNoteMsg",
+                      noteId: note.noteId(noteModel),
+                      msg: noteMsg,
+                    })
+                  ),
+                  apply(dispatch)
+                )}
+              </React.Fragment>
+            ))
+          )}
+        </div>
+      </>
+    );
 
-const noNotes: Html<Msg> = (dispatch) => createNoteButton(dispatch);
+const noNotes: Html<Msg> = () => <div className="flex-grow" />;
 
 const createNoteButton: Html<Msg> = (dispatch) => (
-  <div className="sticky flex flex-row justify-center w-full bottom-0 p-4 bg-white">
+  <div className="sticky flex flex-row justify-center w-full bottom-0 p-4 bg-white z-20 border-t border-stone-300">
     <button
       className="w-full max-w-3xl p-4 text-xl font-bold text-yellow-600 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 active:text-yellow-50 active:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 border-2 border-yellow-600 rounded-lg transition duration-100"
       onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}
