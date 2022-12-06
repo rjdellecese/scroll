@@ -1,6 +1,8 @@
-import { Editor, Extension } from "@tiptap/core";
+import type { Editor } from "@tiptap/core";
+import { Extension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Editor as ReactEditor, EditorContent, useEditor } from "@tiptap/react";
+import type { Editor as ReactEditor } from "@tiptap/react";
+import { EditorContent, useEditor } from "@tiptap/react";
 import type { ConvexReactClient } from "convex/react";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
@@ -18,7 +20,7 @@ import { DateTime } from "luxon";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
-import { Dispatch, ReactElement, useRef } from "react";
+import type { Dispatch, ReactElement } from "react";
 import React from "react";
 import { match, P } from "ts-pattern";
 
@@ -61,7 +63,7 @@ type LoadedModel = {
   initialProseMirrorDoc: string;
   initialVersion: number;
   clientId: string;
-  editor: ReactEditor;
+  editor: Editor;
   areStepsInFlight: boolean;
 };
 
@@ -308,7 +310,7 @@ export const update =
       ]);
 
 const receiveSteps: (
-  editor: ReactEditor,
+  editor: Editor,
   steps: NonEmptyArray<{ proseMirrorStep: string; clientId: string }>
 ) => Cmd<never> = (editor, steps_) => {
   const { steps, clientIds } = nonEmptyArray.reduce<
@@ -474,8 +476,6 @@ const Editor_ = ({
       ...extensions,
       Placeholder.configure({
         placeholder: "Write something…",
-        emptyEditorClass:
-          "first:before:h-0 first:before:text-stone-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none",
       }),
       Extension.create({
         addProseMirrorPlugins: () => [
@@ -554,16 +554,15 @@ const LoadedEditor = ({
   creationTime: number;
   editor: ReactEditor;
 }) => {
-  const ref: React.Ref<HTMLDivElement> = useRef(null);
+  const ref: React.Ref<HTMLDivElement> = React.useRef(null);
 
   // TODO: Only scroll down if note is in or above viewport
   useStableLayoutEffect(
     () => {
       // TODO
       match(option.fromNullable(ref.current))
-        .with(
-          { _tag: "Some", value: P.select() },
-          (value) => window.scrollBy({ top: value.offsetHeight + 32 }) // NOTE: We need to add the column gap
+        .with({ _tag: "Some", value: P.select() }, (value) =>
+          window.scrollBy({ top: value.offsetHeight })
         )
         .with({ _tag: "None" }, constVoid)
         .exhaustive();
@@ -593,8 +592,8 @@ const LoadedEditor = ({
   );
 
   return (
-    <div ref={ref} className="flex flex-col gap-y-4">
-      <div className="flex justify-between sticky top-12 font-light text-stone-500 bg-white z-10 border-b border-stone-300">
+    <div ref={ref} className="flex flex-col">
+      <div className="flex justify-between sticky px-8 top-12 font-light text-stone-500 bg-white z-10 border-b border-stone-300">
         <span>{relativeFormattedCreationTime}</span>
         <span>{absoluteFormattedCreationTime}</span>
       </div>

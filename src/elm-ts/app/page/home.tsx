@@ -110,6 +110,7 @@ export const update =
                 _tag: "LoadedNotes",
                 noteModels,
                 loadMore,
+                isTopInView: false,
               })
             )
           )
@@ -403,7 +404,7 @@ const View = ({
       <div className="sticky top-0 h-12 z-50 px-4 py-2 flex flex-row content-center justify-end border-b border-b-stone-300 bg-stone-50">
         <UserButton appearance={{ elements: { rootBox: "self-center" } }} />
       </div>
-      <div className="flex flex-col items-center m-4">
+      <div className="flex flex-col items-center my-4">
         <div className="flex flex-col grow justify-end max-w-3xl w-full mt-6">
           {match<Model, Html<Msg>>(model)
             .with({ _tag: "LoadingNotes" }, () => loadingNotes)
@@ -450,7 +451,7 @@ const loadedNotes: ({
   (dispatch) =>
     (
       <>
-        <div className="flex flex-col gap-y-8">
+        <div className="flex flex-col">
           <InView
             onChange={(isInView) =>
               dispatch({ _tag: "InViewStatusChanged", isInView })
@@ -464,7 +465,7 @@ const loadedNotes: ({
                   </div>
                 ))
                 .with(false, () => (
-                  <div className="text-stone-400 place-self-center">
+                  <div className="text-stone-400 place-self-center pb-8">
                     You've reached the beginning!
                   </div>
                 ))
@@ -497,7 +498,7 @@ const loadedNotes: ({
 const noNotes: Html<Msg> = () => <div className="flex-grow" />;
 
 const createNoteButton: Html<Msg> = (dispatch) => (
-  <div className="sticky flex flex-row justify-center w-full bottom-0 p-4 bg-white z-20 border-t border-stone-300">
+  <div className="sticky flex flex-row justify-center w-full bottom-0 px-8 py-4 bg-white z-20 border-t border-stone-300">
     <button
       className="w-full max-w-3xl p-4 text-xl font-bold text-yellow-600 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 active:text-yellow-50 active:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 border-2 border-yellow-600 rounded-lg transition duration-100"
       onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}

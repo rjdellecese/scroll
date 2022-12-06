@@ -110,6 +110,10 @@
   }
 }
 
+.ProseMirror-focused .is-editor-empty {
+  @apply first:before:h-0 first:before:text-stone-400 first:before:float-left first:before:content-[attr(data-placeholder)] first:before:pointer-events-none;
+}
+
 button {
   @apply select-none;
 }
