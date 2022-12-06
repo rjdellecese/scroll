@@ -460,12 +460,12 @@ const loadedNotes: ({
             {({ ref }) =>
               match(canLoadMore)
                 .with(true, () => (
-                  <div ref={ref} className="flex place-content-center">
+                  <div ref={ref} className="flex place-content-center pb-8">
                     <LoadingSpinner />
                   </div>
                 ))
                 .with(false, () => (
-                  <div className="text-stone-400 place-self-center pb-8">
+                  <div className="text-stone-400 place-self-center pt-8 pb-16">
                     You've reached the beginning!
                   </div>
                 ))
