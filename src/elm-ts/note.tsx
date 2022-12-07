@@ -16,7 +16,7 @@ import {
   useStableEffect,
   useStableLayoutEffect,
 } from "fp-ts-react-stable-hooks";
-import { DateTime } from "luxon";
+import { DateTime, Duration } from "luxon";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
@@ -554,48 +554,34 @@ const LoadedEditor = ({
   creationTime: number;
   editor: ReactEditor;
 }) => {
-  const ref: React.Ref<HTMLDivElement> = React.useRef(null);
-
-  // TODO: Only scroll down if note is in or above viewport
-  useStableLayoutEffect(
-    () => {
-      // TODO
-      match(option.fromNullable(ref.current))
-        .with({ _tag: "Some", value: P.select() }, (value) =>
-          window.scrollBy({ top: value.offsetHeight })
-        )
-        .with({ _tag: "None" }, constVoid)
-        .exhaustive();
-    },
-    [],
-    eq.tuple()
-  );
-
   const creationDateTime = DateTime.fromMillis(creationTime);
 
-  const relativeFormattedCreationTime = match<boolean, string>(
-    DateTime.fromMillis(currentTime).diff(creationDateTime).as("minutes") < 1
+  const formattedCreationTime = match<Duration, string>(
+    DateTime.fromMillis(currentTime).diff(creationDateTime)
   )
-    .with(true, () => "a few seconds ago")
-    .with(false, () => creationDateTime.toRelative() || "") // TODO: When can this be null?
-    .exhaustive();
-
-  const absoluteFormattedCreationTime: string = creationDateTime.toLocaleString(
-    {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      weekday: "short",
-      hour: "numeric",
-      minute: "numeric",
-    }
-  );
+    .when(
+      (duration) => duration.as("minutes") < 1,
+      () => "a few seconds ago"
+    )
+    .when(
+      (duration) => duration.as("weeks") < 4,
+      () => creationDateTime.toRelative() || ""
+    ) // TODO: When can this be null?
+    .otherwise(() =>
+      creationDateTime.toLocaleString({
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        weekday: "short",
+        hour: "numeric",
+        minute: "numeric",
+      })
+    );
 
   return (
-    <div ref={ref} className="flex flex-col">
+    <div className="flex flex-col">
       <div className="flex justify-between sticky px-8 top-12 font-light text-stone-500 bg-white z-10 border-b border-stone-300">
-        <span>{relativeFormattedCreationTime}</span>
-        <span>{absoluteFormattedCreationTime}</span>
+        <span>{formattedCreationTime}</span>
       </div>
       <EditorContent editor={editor} />
     </div>
