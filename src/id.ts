@@ -4,10 +4,6 @@ import type { Ord } from "fp-ts/lib/Ord";
 
 import type { Id, TableNames } from "~src/convex/_generated/dataModel";
 
-export const URI = "Id";
-
-export type URI = typeof URI;
-
 // TYPECLASS INSTANCES
 
 export const getEq = <TableName extends TableNames>(): Eq<Id<TableName>> => ({

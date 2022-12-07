@@ -12,11 +12,9 @@ import { eq, io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
 import { constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
-import {
-  useStableEffect,
-  useStableLayoutEffect,
-} from "fp-ts-react-stable-hooks";
-import { DateTime, Duration } from "luxon";
+import { useStableEffect } from "fp-ts-react-stable-hooks";
+import type { Duration } from "luxon";
+import { DateTime } from "luxon";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
@@ -29,6 +27,7 @@ import type { Id } from "~src/convex/_generated/dataModel";
 import { useQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
+import * as dispatch from "~src/elm-ts/dispatch-extra";
 import * as logMessage from "~src/elm-ts/log-message";
 import { extensions } from "~src/tiptap-schema-extensions";
 import type { VersionedNote } from "~src/versioned-note";
@@ -355,24 +354,27 @@ const sendSteps = (
 // VIEW
 
 export const view: (currentTime: number) => (model: Model) => Html<Msg> =
-  (currentTime) => (model) => (dispatch) =>
+  (currentTime) => (model) => (dispatch_) =>
     match(model)
       .with(
         { _tag: "LoadingNoteAndClientId", noteId: P.select() },
         (noteId) => (
-          <LoadingNoteAndClientId dispatch={dispatch} noteId={noteId} />
+          <LoadingNoteAndClientId dispatch={dispatch_} noteId={noteId} />
         )
       )
       .with({ _tag: "LoadingEditor" }, { _tag: "Loaded" }, (model_) => (
-        <Editor_
+        <LoadingEditorOrLoaded
           {...match<
             LoadingEditorModel | LoadedModel,
-            Parameters<typeof Editor_>[0]
+            Parameters<typeof LoadingEditorOrLoaded>[0]
           >(model_)
             .with(
               { _tag: "LoadingEditor" },
-              ({ versionedNote, clientId }): Parameters<typeof Editor_>[0] => ({
-                dispatch,
+              ({
+                versionedNote,
+                clientId,
+              }): Parameters<typeof LoadingEditorOrLoaded>[0] => ({
+                dispatch: dispatch_,
                 currentTime,
                 noteId: versionedNote._id,
                 creationTime: versionedNote._creationTime,
@@ -389,8 +391,8 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
                 creationTime,
                 initialProseMirrorDoc,
                 initialVersion,
-              }): Parameters<typeof Editor_>[0] => ({
-                dispatch,
+              }): Parameters<typeof LoadingEditorOrLoaded>[0] => ({
+                dispatch: dispatch_,
                 currentTime,
                 noteId,
                 creationTime,
@@ -405,7 +407,7 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
       .exhaustive();
 
 const LoadingNoteAndClientId = ({
-  dispatch,
+  dispatch: dispatch_,
   noteId,
 }: {
   dispatch: Dispatch<Msg>;
@@ -420,7 +422,7 @@ const LoadingNoteAndClientId = ({
       match(optionVersionedNote)
         .with({ _tag: "None" }, constVoid)
         .with({ _tag: "Some", value: P.select() }, (versionedNote_) =>
-          dispatch({
+          dispatch_({
             _tag: "GotLoadingNoteAndClientIdMsg",
             msg: {
               _tag: "VersionedNoteReceived",
@@ -430,15 +432,14 @@ const LoadingNoteAndClientId = ({
         )
         .exhaustive();
     },
-    [optionVersionedNote],
-    eq.tuple(option.getEq(versionedNote.Eq))
+    [optionVersionedNote, dispatch_],
+    eq.tuple(option.getEq(versionedNote.Eq), dispatch.getEq<Msg>())
   );
 
   return null;
 };
 
-// TODO: Split this into two components, one for each Model variant.
-const Editor_ = ({
+const LoadingEditorOrLoaded = ({
   dispatch,
   currentTime,
   noteId,
@@ -566,7 +567,7 @@ const LoadedEditor = ({
     .when(
       (duration) => duration.as("weeks") < 4,
       () => creationDateTime.toRelative() || ""
-    ) // TODO: When can this be null?
+    )
     .otherwise(() =>
       creationDateTime.toLocaleString({
         year: "numeric",

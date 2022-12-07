@@ -5,21 +5,10 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { array, either, eq, option, readonlyArray, tuple } from "fp-ts";
-import {
-  apply,
-  constant,
-  constNull,
-  constVoid,
-  flow,
-  identity,
-  pipe,
-} from "fp-ts/function";
+import { apply, constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { Either } from "fp-ts/lib/Either";
-import { Option } from "fp-ts/lib/Option";
-import {
-  useStableEffect,
-  useStableLayoutEffect,
-} from "fp-ts-react-stable-hooks";
+import type { Option } from "fp-ts/lib/Option";
+import { useStableEffect } from "fp-ts-react-stable-hooks";
 import { Lens } from "monocle-ts";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
@@ -31,6 +20,7 @@ import type { Id } from "~src/convex/_generated/dataModel";
 import { usePaginatedQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
+import * as dispatch from "~src/elm-ts/dispatch-extra";
 import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
 import type { LogMessage } from "~src/elm-ts/log-message";
 import * as logMessage from "~src/elm-ts/log-message";
@@ -61,8 +51,7 @@ export const init: Model = {
 export type Msg =
   | { _tag: "CreateNoteButtonClicked" }
   | {
-      // TODO: Change name to "GetNotesResultChanged" or something
-      _tag: "GotNotes";
+      _tag: "PaginatedNotesResultChanged";
       noteIds: Id<"notes">[];
       loadMore: Option<Cmd<Msg>>;
     }
@@ -93,7 +82,7 @@ export const update =
       .with(
         [
           {
-            _tag: "GotNotes",
+            _tag: "PaginatedNotesResultChanged",
             noteIds: P.select("noteIds"),
             loadMore: P.select("loadMore"),
           },
@@ -104,8 +93,7 @@ export const update =
             noteIds,
             array.reverse,
             noteIdsToNoteModels,
-            tuple.bimap(
-              (cmd_) => cmd.batch([cmd_, scrollToBottom]),
+            tuple.mapFst(
               (noteModels): LoadedNotesModel => ({
                 _tag: "LoadedNotes",
                 noteModels,
@@ -118,7 +106,7 @@ export const update =
       .with(
         [
           {
-            _tag: "GotNotes",
+            _tag: "PaginatedNotesResultChanged",
             noteIds: P.select("noteIds"),
             loadMore: P.select("loadMore"),
           },
@@ -341,16 +329,6 @@ const noteIdsToNoteModels = (
     tuple.mapSnd(cmd.batch)
   );
 
-const scrollToBottom: Cmd<never> = pipe(
-  cmdExtra.fromIOVoid(() =>
-    // I haven't been able to figure out why, but we need to wait one more animation frame here to ensure that everything is rendered before we try to scroll to the bottom.
-    window.scrollTo({
-      top: document.body.scrollHeight,
-    })
-  ),
-  cmdExtra.scheduleForNextAnimationFrame
-);
-
 // VIEW
 
 export const view: (currentTime: number) => (model: Model) => Html<Msg> =
@@ -358,7 +336,7 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
     <View dispatch={dispatch} currentTime={currentTime} model={model} />;
 
 const View = ({
-  dispatch,
+  dispatch: dispatch_,
   currentTime,
   model,
 }: {
@@ -381,8 +359,8 @@ const View = ({
             loadMore: P.select("loadMore"),
           },
           ({ noteIds, loadMore }) =>
-            dispatch({
-              _tag: "GotNotes",
+            dispatch_({
+              _tag: "PaginatedNotesResultChanged",
               noteIds,
               loadMore: pipe(
                 loadMore,
@@ -393,10 +371,13 @@ const View = ({
               ),
             })
         )
-        .otherwise(() => dispatch({ _tag: "GotUnexpectedPaginationState" }));
+        .otherwise(() => dispatch_({ _tag: "GotUnexpectedPaginationState" }));
     },
-    [paginatedNoteIds],
-    eq.tuple(usePaginatedQueryResultExtra.getEq(id.getEq<"notes">()))
+    [paginatedNoteIds, dispatch_],
+    eq.tuple(
+      usePaginatedQueryResultExtra.getEq(id.getEq<"notes">()),
+      dispatch.getEq<Msg>()
+    )
   );
 
   return (
@@ -404,7 +385,7 @@ const View = ({
       <div className="sticky top-0 h-12 z-50 px-4 py-2 flex flex-row content-center justify-end border-b border-b-stone-300 bg-stone-50">
         <UserButton appearance={{ elements: { rootBox: "self-center" } }} />
       </div>
-      <div className="flex flex-col items-center my-4">
+      <div className="flex flex-col items-center mt-4">
         <div className="flex flex-col grow justify-end max-w-3xl w-full mt-6">
           {match<Model, Html<Msg>>(model)
             .with({ _tag: "LoadingNotes" }, () => loadingNotes)
@@ -423,12 +404,12 @@ const View = ({
                 )
               )
             )
-            .exhaustive()(dispatch)}
+            .exhaustive()(dispatch_)}
         </div>
       </div>
       {match(model)
         .with({ _tag: "LoadingNotes" }, () => null)
-        .with({ _tag: "LoadedNotes" }, () => createNoteButton(dispatch))
+        .with({ _tag: "LoadedNotes" }, () => createNoteButton(dispatch_))
         .exhaustive()}
     </>
   );
@@ -448,13 +429,13 @@ const loadedNotes: ({
   canLoadMore: boolean;
 }) => Html<Msg> =
   ({ currentTime, noteModels, canLoadMore }) =>
-  (dispatch) =>
+  (dispatch_) =>
     (
       <>
         <div className="flex flex-col">
           <InView
             onChange={(isInView) =>
-              dispatch({ _tag: "InViewStatusChanged", isInView })
+              dispatch_({ _tag: "InViewStatusChanged", isInView })
             }
           >
             {({ ref }) =>
@@ -486,7 +467,7 @@ const loadedNotes: ({
                       msg: noteMsg,
                     })
                   ),
-                  apply(dispatch)
+                  apply(dispatch_)
                 )}
               </React.Fragment>
             ))
@@ -497,11 +478,11 @@ const loadedNotes: ({
 
 const noNotes: Html<Msg> = () => <div className="flex-grow" />;
 
-const createNoteButton: Html<Msg> = (dispatch) => (
+const createNoteButton: Html<Msg> = (dispatch_) => (
   <div className="sticky flex flex-row justify-center w-full bottom-0 px-8 py-4 bg-white z-20 border-t border-stone-300">
     <button
       className="w-full max-w-3xl p-4 text-xl font-bold text-yellow-600 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 active:text-yellow-50 active:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 border-2 border-yellow-600 rounded-lg transition duration-100"
-      onClick={() => dispatch({ _tag: "CreateNoteButtonClicked" })}
+      onClick={() => dispatch_({ _tag: "CreateNoteButtonClicked" })}
     >
       Create Note
     </button>
