@@ -1,9 +1,9 @@
-name: main
+name: CI
 
 on: push
 
 jobs:
-  main:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
