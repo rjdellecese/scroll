@@ -12,7 +12,10 @@ import { eq, io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
 import { constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
-import { useStableEffect } from "fp-ts-react-stable-hooks";
+import {
+  useStableEffect,
+  useStableLayoutEffect,
+} from "fp-ts-react-stable-hooks";
 import type { Duration } from "luxon";
 import { DateTime } from "luxon";
 import { Lens } from "monocle-ts";
@@ -555,6 +558,23 @@ const LoadedEditor = ({
   creationTime: number;
   editor: ReactEditor;
 }) => {
+  const ref: React.Ref<HTMLDivElement> = React.useRef(null);
+
+  // TODO: Only scroll down if note is in or above viewport
+  useStableLayoutEffect(
+    () => {
+      // TODO
+      match(option.fromNullable(ref.current))
+        .with({ _tag: "Some", value: P.select() }, (value) =>
+          window.scrollBy({ top: value.offsetHeight })
+        )
+        .with({ _tag: "None" }, constVoid)
+        .exhaustive();
+    },
+    [],
+    eq.tuple()
+  );
+
   const creationDateTime = DateTime.fromMillis(creationTime);
 
   const formattedCreationTime = match<Duration, string>(
@@ -580,7 +600,7 @@ const LoadedEditor = ({
     );
 
   return (
-    <div className="flex flex-col">
+    <div ref={ref} className="flex flex-col">
       <div className="flex justify-between sticky px-8 top-12 font-light text-stone-500 bg-white z-10 border-b border-stone-300">
         <span>{formattedCreationTime}</span>
       </div>

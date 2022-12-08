@@ -438,20 +438,18 @@ const loadedNotes: ({
               dispatch_({ _tag: "InViewStatusChanged", isInView })
             }
           >
-            {({ ref }) =>
-              match(canLoadMore)
-                .with(true, () => (
-                  <div ref={ref} className="flex place-content-center pb-8">
-                    <LoadingSpinner />
-                  </div>
-                ))
-                .with(false, () => (
-                  <div className="text-stone-400 place-self-center pt-8 pb-16">
-                    You've reached the beginning!
-                  </div>
-                ))
-                .exhaustive()
-            }
+            {({ ref }) => (
+              <div ref={ref} className="flex place-content-center pt-8 pb-16">
+                {match(canLoadMore)
+                  .with(true, () => <LoadingSpinner />)
+                  .with(false, () => (
+                    <span className="text-stone-400">
+                      You've reached the beginning!
+                    </span>
+                  ))
+                  .exhaustive()}
+              </div>
+            )}
           </InView>
           {pipe(
             noteModels,
