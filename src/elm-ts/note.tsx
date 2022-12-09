@@ -10,6 +10,7 @@ import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
 import { eq, io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
 import { constVoid, flow, identity, pipe } from "fp-ts/function";
+import type { IO } from "fp-ts/lib/IO";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
 import {
@@ -258,7 +259,16 @@ export const update =
               .with({ _tag: "ComponentDidMount", el: P.select() }, (el) => [
                 loadedModel,
                 pipe(
-                  () => window.scrollBy({ top: el.offsetHeight }),
+                  el,
+                  isBelowViewport,
+                  io.map((isBelowViewport_) =>
+                    match(isBelowViewport_)
+                      .with(false, () =>
+                        window.scrollBy({ top: el.offsetHeight })
+                      )
+                      .with(true, constVoid)
+                      .exhaustive()
+                  ),
                   cmdExtra.fromIOVoid,
                   cmdExtra.scheduleForNextAnimationFrame
                 ),
@@ -572,7 +582,6 @@ const LoadedEditor = ({
 }) => {
   const ref: React.Ref<HTMLDivElement> = React.useRef(null);
 
-  // TODO: Only scroll down if note is in or above viewport
   useStableLayoutEffect(
     () => {
       match(option.fromNullable(ref.current))
@@ -622,6 +631,15 @@ const LoadedEditor = ({
     </div>
   );
 };
+
+const isBelowViewport: (el: Element) => IO<boolean> = (el) => () =>
+  pipe(
+    el.getBoundingClientRect(),
+    (rect) =>
+      rect.bottom >
+        (window.innerHeight || document.documentElement.clientHeight) &&
+      rect.top < 0
+  );
 
 // SUBSCRIPTIONS
 
