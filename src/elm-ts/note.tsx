@@ -258,7 +258,7 @@ export const update =
               .with({ _tag: "ComponentDidMount", el: P.select() }, (el) => [
                 loadedModel,
                 cmdExtra.fromIOVoid(() =>
-                  window.scrollTo({ top: window.scrollY + el.offsetHeight })
+                  window.scrollBy({ top: el.offsetHeight })
                 ),
               ])
               .with({ _tag: "EditorTransactionApplied" }, () =>
