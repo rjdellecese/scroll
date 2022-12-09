@@ -118,6 +118,7 @@ type LoadingEditorMsg = {
 };
 
 type LoadedMsg =
+  | { _tag: "ComponentDidMount"; el: HTMLDivElement }
   | { _tag: "EditorTransactionApplied" }
   | { _tag: "StepsSent" }
   | {
@@ -254,6 +255,12 @@ export const update =
             )
           )(
             match<LoadedMsg, [LoadedModel, Cmd<LoadedMsg>]>(loadedMsg)
+              .with({ _tag: "ComponentDidMount", el: P.select() }, (el) => [
+                loadedModel,
+                cmdExtra.fromIOVoid(() =>
+                  window.scrollTo({ top: window.scrollY + el.offsetHeight })
+                ),
+              ])
               .with({ _tag: "EditorTransactionApplied" }, () =>
                 match<boolean, [LoadedModel, Cmd<LoadedMsg>]>(
                   loadedModel.areStepsInFlight
@@ -443,7 +450,7 @@ const LoadingNoteAndClientId = ({
 };
 
 const LoadingEditorOrLoaded = ({
-  dispatch,
+  dispatch: dispatch_,
   currentTime,
   noteId,
   creationTime,
@@ -488,7 +495,7 @@ const LoadingEditorOrLoaded = ({
       }),
     ],
     onBeforeCreate: ({ editor: editor_ }) => {
-      dispatch({
+      dispatch_({
         _tag: "GotLoadingEditorMsg",
         msg: {
           _tag: "EditorLoaded",
@@ -497,7 +504,7 @@ const LoadingEditorOrLoaded = ({
       });
     },
     onTransaction: () => {
-      dispatch({
+      dispatch_({
         _tag: "GotLoadedMsg",
         msg: {
           _tag: "EditorTransactionApplied",
@@ -532,14 +539,15 @@ const LoadingEditorOrLoaded = ({
               },
             })
           ),
-          option.match(constVoid, (msg) => dispatch(msg))
+          option.match(constVoid, (msg) => dispatch_(msg))
         )
       )
     );
-  }, [stepsSince, dispatch]);
+  }, [stepsSince, dispatch_]);
 
   return editor ? (
     <LoadedEditor
+      dispatch={dispatch_}
       currentTime={currentTime}
       creationTime={creationTime}
       editor={editor}
@@ -550,10 +558,12 @@ const LoadingEditorOrLoaded = ({
 };
 
 const LoadedEditor = ({
+  dispatch: dispatch_,
   currentTime,
   creationTime,
   editor,
 }: {
+  dispatch: Dispatch<Msg>;
   currentTime: number;
   creationTime: number;
   editor: ReactEditor;
@@ -563,16 +573,18 @@ const LoadedEditor = ({
   // TODO: Only scroll down if note is in or above viewport
   useStableLayoutEffect(
     () => {
-      // TODO
       match(option.fromNullable(ref.current))
         .with({ _tag: "Some", value: P.select() }, (value) =>
-          window.scrollBy({ top: value.offsetHeight })
+          dispatch_({
+            _tag: "GotLoadedMsg",
+            msg: { _tag: "ComponentDidMount", el: value },
+          })
         )
         .with({ _tag: "None" }, constVoid)
         .exhaustive();
     },
-    [],
-    eq.tuple()
+    [dispatch_],
+    eq.tuple(dispatch.getEq<Msg>())
   );
 
   const creationDateTime = DateTime.fromMillis(creationTime);
