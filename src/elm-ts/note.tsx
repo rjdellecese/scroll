@@ -257,8 +257,10 @@ export const update =
             match<LoadedMsg, [LoadedModel, Cmd<LoadedMsg>]>(loadedMsg)
               .with({ _tag: "ComponentDidMount", el: P.select() }, (el) => [
                 loadedModel,
-                cmdExtra.fromIOVoid(() =>
-                  window.scrollBy({ top: el.offsetHeight })
+                pipe(
+                  () => window.scrollBy({ top: el.offsetHeight }),
+                  cmdExtra.fromIOVoid,
+                  cmdExtra.scheduleForNextAnimationFrame
                 ),
               ])
               .with({ _tag: "EditorTransactionApplied" }, () =>
