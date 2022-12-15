@@ -305,15 +305,12 @@ export const update =
                     ),
                     cmd.none,
                   ])
-                  .with(P.not(null), ({ version, steps }) => {
-                    console.log("true sendable");
-                    return [
-                      Lens.fromProp<LoadedModel>()("areStepsInFlight").set(
-                        true
-                      )(loadedModel),
-                      sendSteps(convex, loadedModel, version, steps),
-                    ];
-                  })
+                  .with(P.not(null), ({ version, steps }) => [
+                    Lens.fromProp<LoadedModel>()("areStepsInFlight").set(true)(
+                      loadedModel
+                    ),
+                    sendSteps(convex, loadedModel, version, steps),
+                  ])
                   .exhaustive()
               )
               .with({ _tag: "StepsReceived" }, ({ steps }) => [
