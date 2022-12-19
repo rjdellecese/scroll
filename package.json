@@ -11,7 +11,7 @@
     "url": "git+https://github.com/rjdellecese/scroll.git"
   },
   "devDependencies": {
-    "@parcel/validator-typescript": "^2.7.0",
+    "@parcel/validator-typescript": "^2.8.2",
     "@tailwindcss/typography": "^0.5.8",
     "@tsconfig/node16-strictest": "^1.0.4",
     "@tsconfig/recommended": "^1.0.1",
