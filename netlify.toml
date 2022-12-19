@@ -1,7 +1,6 @@
 [build]
   publish = "dist/"
   command = "npx convex deploy && npx parcel build src/elm-ts/index.html"
-  environment = { NODE_VERSION = "18" }
 [functions]
   directory = "src/netlify/"
 [dev]
