@@ -1,5 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import type { Response as NetlifyResponse } from "@netlify/functions/dist/function/response";
+import type { Response } from "@netlify/functions/dist/function/response";
 import {
   either,
   json,
@@ -13,8 +13,8 @@ import { constVoid, flow, pipe } from "fp-ts/lib/function";
 import type { Json } from "fp-ts/lib/Json";
 import type { TaskEither } from "fp-ts/lib/TaskEither";
 import { url } from "fp-ts-std";
-import type { Response as GotResponse } from "got";
-import got from "got";
+import type { Response as FetchResponse } from "node-fetch";
+import fetch from "node-fetch";
 import { match, P } from "ts-pattern";
 
 import * as sentryConfig from "../sentry-config";
@@ -73,7 +73,7 @@ const handler: Handler = async (event) =>
     taskEither.chainW(({ envelope, projectId }) =>
       pipe(
         () =>
-          got(`https://sentry.io/api/${projectId}/envelope/`, {
+          fetch(`https://sentry.io/api/${projectId}/envelope/`, {
             method: "POST",
             body: envelope,
           }),
@@ -82,8 +82,8 @@ const handler: Handler = async (event) =>
             boolean,
             TaskEither<
               {
-                statusCode: GotResponse["statusCode"];
-                statusMessage: GotResponse["statusMessage"];
+                statusCode: FetchResponse["status"];
+                statusText: FetchResponse["statusText"];
                 body: string;
               },
               void
@@ -93,11 +93,11 @@ const handler: Handler = async (event) =>
             .with(
               false,
               () => () =>
-                Promise.resolve(
+                response.text().then((body) =>
                   either.left({
-                    statusCode: response.statusCode,
-                    statusMessage: response.statusMessage,
-                    body: response.body,
+                    statusCode: response.status,
+                    statusText: response.statusText,
+                    body,
                   })
                 )
             )
@@ -106,12 +106,12 @@ const handler: Handler = async (event) =>
       )
     ),
     taskEither.match(
-      (error): NetlifyResponse => {
+      (error): Response => {
         const errorMessage = "Failed to send to Sentry";
         console.error(errorMessage, error);
         return { statusCode: 400, body: errorMessage };
       },
-      (): NetlifyResponse => ({ statusCode: 200 })
+      (): Response => ({ statusCode: 200 })
     )
   )();
 
