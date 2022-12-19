@@ -1,6 +1,6 @@
 [build]
   publish = "dist/"
-  command = "npx convex codegen && npx parcel build src/elm-ts/index.html && npx convex deploy --codegen=false"
+  command = "npx convex codegen && npx parcel build src/elm-ts/index.html && npx convex deploy --codegen=disable"
 [functions]
   directory = "src/netlify/"
 [dev]
