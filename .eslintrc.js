@@ -31,6 +31,7 @@ module.exports = {
     "no-type-assertion/no-type-assertion": "warn",
     "no-unused-vars": "off",
     "no-redeclare": "off", // `fp-ts` relies on redeclarations for its implementation of higher-kinded types
+    "no-shadow": "error",
     "react-hooks/exhaustive-deps": [
       "warn",
       {

@@ -118,7 +118,7 @@ export const update =
               loadedNotesModel,
               logMessage.report(stage)(logMessage_),
             ],
-            ([noteModels, cmd]: [note.Model[], Cmd<Msg>]): [
+            ([noteModels, cmd_]: [note.Model[], Cmd<Msg>]): [
               Model,
               Cmd<Msg>
             ] => [
@@ -127,7 +127,7 @@ export const update =
                 Lens.fromProp<LoadedNotesModel>()("noteModels").set(noteModels),
                 Lens.fromProp<LoadedNotesModel>()("loadMore").set(loadMore)
               ),
-              cmd,
+              cmd_,
             ]
           )(reconcileNotes(array.reverse(noteIds), loadedNotesModel.noteModels))
       )
@@ -332,8 +332,8 @@ const noteIdsToNoteModels = (
 // VIEW
 
 export const view: (currentTime: number) => (model: Model) => Html<Msg> =
-  (currentTime) => (model) => (dispatch) =>
-    <View dispatch={dispatch} currentTime={currentTime} model={model} />;
+  (currentTime) => (model) => (dispatch_) =>
+    <View dispatch={dispatch_} currentTime={currentTime} model={model} />;
 
 const View = ({
   dispatch: dispatch_,

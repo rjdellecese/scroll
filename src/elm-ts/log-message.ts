@@ -56,8 +56,8 @@ export function error(message: string, details: Details = {}): LogMessage {
   ];
 }
 
-export function exception(exception: unknown): LogMessage {
-  return [{ tag: "Exception", exception: exception }];
+export function exception(exception_: unknown): LogMessage {
+  return [{ tag: "Exception", exception: exception_ }];
 }
 
 export function fromValidationErrors(codecErrors: t.Errors): LogMessage {
@@ -106,7 +106,7 @@ function reportToSentryIO(logMessage: LogMessage): IO<void> {
         )
         .with(
           { tag: "Exception", exception: P.select() },
-          (exception) => () => Sentry.captureException(exception)
+          (exception_) => () => Sentry.captureException(exception_)
         )
         .exhaustive(),
       io.map(constVoid)

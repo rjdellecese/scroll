@@ -61,7 +61,7 @@ export const fromIO: FromIO1<URI>["fromIO"] = (ma) =>
 
 export const fromTask: FromTask1<URI>["fromTask"] = flow(
   taskOption.fromTask,
-  (taskOption) => rxjs.of(taskOption)
+  (taskOption_) => rxjs.of(taskOption_)
 );
 
 // TYPECLASS INSTANCES
@@ -148,6 +148,6 @@ export const fromIOVoid: (ioVoid: IO<void>) => Cmd<never> = flow(
 );
 
 // There is a difference, at least for RxJs version 6.x, betweeen setting the scheduler via the `observeOn` operator and setting it as an argument to an `Observable` constructor function. See the following for some more detail: https://indepth.dev/posts/1012/rxjs-applying-asyncscheduler-as-an-argument-vs-with-observeon-operator
-export const scheduleForNextAnimationFrame: <A>(cmd: Cmd<A>) => Cmd<A> = (
-  cmd
-) => rxjs.scheduled(cmd, rxjs.animationFrameScheduler);
+export const scheduleForNextAnimationFrame: <A>(cmd_: Cmd<A>) => Cmd<A> = (
+  cmd_
+) => rxjs.scheduled(cmd_, rxjs.animationFrameScheduler);
