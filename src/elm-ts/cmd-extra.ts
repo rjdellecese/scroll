@@ -13,9 +13,12 @@ import type { Monad1 } from "fp-ts/Monad";
 import type { Monoid } from "fp-ts/Monoid";
 import type { Option } from "fp-ts/Option";
 import type { Pointed1 } from "fp-ts/Pointed";
-import { observable } from "fp-ts-rxjs";
 import * as rxjs from "rxjs";
-import { map as rxMap, mergeMap as rxMergeMap } from "rxjs/operators";
+import {
+  map as rxMap,
+  mergeAll as rxMergeAll,
+  mergeMap as rxMergeMap,
+} from "rxjs/operators";
 
 export const URI = "Cmd";
 
@@ -33,37 +36,32 @@ const _chain: Monad1<URI>["chain"] = (fa, f) => pipe(fa, chain(f));
 
 export const map: <A, B>(f: (a: A) => B) => (fa: Cmd<A>) => Cmd<B> =
   (f) => (fa) =>
-    observable.map(taskOption.map(f))(fa);
-
+    rxMap(taskOption.map(f))(fa);
 export const ap: <A, B>(f: Cmd<(a: A) => B>) => (fa: Cmd<A>) => Cmd<B> =
   (f) => (fa) =>
     rxjs
       .combineLatest([f, fa])
       .pipe(rxMap(([f_, fa_]) => taskOption.ap(fa_)(f_)));
 
-export const chain: <A, B>(f: (a: A) => Cmd<B>) => (fa: Cmd<A>) => Cmd<B> =
-  (f) => (fa) => {
-    return fa.pipe(
-      rxMergeMap(
-        flow(
-          taskOption.match(constant(cmd.none), f),
-          observable.fromTask,
-          observable.flatten
-        )
-      )
-    );
-  };
+export const chain: <A, B>(f: (a: A) => Cmd<B>) => (fa: Cmd<A>) => Cmd<B> = (
+  f
+) =>
+  rxMergeMap(
+    flow(
+      taskOption.match(constant(cmd.none), f),
+      (taskCmd) => rxjs.defer(taskCmd),
+      rxMergeAll()
+    )
+  );
 
 // NATURAL TRANSFORMATIONS
 
-export const fromIO: FromIO1<URI>["fromIO"] = flow(
-  observable.fromIO,
-  observable.map(taskOption.of)
-);
+export const fromIO: FromIO1<URI>["fromIO"] = (ma) =>
+  rxjs.defer(() => rxjs.of(taskOption.of(ma())));
 
 export const fromTask: FromTask1<URI>["fromTask"] = flow(
   taskOption.fromTask,
-  observable.of
+  (taskOption) => rxjs.of(taskOption)
 );
 
 // TYPECLASS INSTANCES
@@ -81,7 +79,7 @@ declare module "fp-ts/lib/HKT" {
   }
 }
 
-export const of: <A>(a: A) => Cmd<A> = flow(taskOption.of, observable.of);
+export const of: <A>(a: A) => Cmd<A> = flow(taskOption.of, (a) => rxjs.of(a));
 
 export const Pointed: Pointed1<URI> = {
   URI: URI,
@@ -152,8 +150,4 @@ export const fromIOVoid: (ioVoid: IO<void>) => Cmd<never> = flow(
 // There is a difference, at least for RxJs version 6.x, betweeen setting the scheduler via the `observeOn` operator and setting it as an argument to an `Observable` constructor function. See the following for some more detail: https://indepth.dev/posts/1012/rxjs-applying-asyncscheduler-as-an-argument-vs-with-observeon-operator
 export const scheduleForNextAnimationFrame: <A>(cmd: Cmd<A>) => Cmd<A> = (
   cmd
-) =>
-  pipe(
-    rxjs.of(taskOption.of(null), rxjs.animationFrameScheduler),
-    chain(() => cmd)
-  );
+) => rxjs.scheduled(cmd, rxjs.animationFrameScheduler);

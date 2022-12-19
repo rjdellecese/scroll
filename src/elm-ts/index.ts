@@ -13,7 +13,7 @@ import { either } from "fp-ts";
 import type { Either } from "fp-ts/lib/Either";
 import { pipe } from "fp-ts/lib/function";
 import type { Option } from "fp-ts/lib/Option";
-import { render } from "react-dom";
+import { createRoot } from "react-dom/client";
 import { match, P } from "ts-pattern";
 
 import * as app from "~/src/elm-ts/app";
@@ -50,16 +50,28 @@ pipe(
       .exhaustive()
   ),
   either.bind("time", () => either.right(new Date().getTime())),
-  either.map(({ time, stageAndProgram }) =>
-    React.run(
-      stageAndProgram.program(
-        app.locationToMsg,
-        app.init,
-        app.update,
-        app.view,
-        app.subscriptions
-      )({ time, stage: stageAndProgram.stage }),
-      (dom) => render(dom, document.getElementById("app"))
+  either.bind("root", () =>
+    pipe(
+      document.getElementById("app"),
+      either.fromNullable("Failed to find app element"),
+      either.map(createRoot)
     )
+  ),
+  either.match(
+    (errorMessage) => {
+      throw new Error(errorMessage);
+    },
+    ({ root, time, stageAndProgram }) => {
+      React.run(
+        stageAndProgram.program(
+          app.locationToMsg,
+          app.init,
+          app.update,
+          app.view,
+          app.subscriptions
+        )({ time, stage: stageAndProgram.stage }),
+        (dom) => root.render(dom)
+      );
+    }
   )
 );

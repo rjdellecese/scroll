@@ -2,9 +2,9 @@ import type { GenericAPI, MutationNames, NamedMutation } from "convex/browser";
 import type { ReactMutation } from "convex/react";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import { task } from "fp-ts";
-import { flow, pipe } from "fp-ts/function";
+import { pipe } from "fp-ts/function";
 import type { Option } from "fp-ts/lib/Option";
-import { observable } from "fp-ts-rxjs";
+import * as rxjs from "rxjs";
 
 export const runMutation: <
   API extends GenericAPI,
@@ -17,6 +17,6 @@ export const runMutation: <
 ) => Cmd<Msg> = (reactMutation, onResponse, ...args) =>
   pipe(
     () => reactMutation(...args),
-    observable.fromTask,
-    observable.map(flow(onResponse, task.of))
+    task.map(onResponse),
+    (taskOption) => rxjs.of(taskOption)
   );

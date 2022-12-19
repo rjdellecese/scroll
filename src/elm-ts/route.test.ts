@@ -1,7 +1,7 @@
 import { describe, expect, test } from "@jest/globals";
 import type { Arbitrary } from "fast-check";
 import * as fc from "fast-check";
-import { array, string } from "fp-ts";
+import { array } from "fp-ts";
 import { pipe } from "fp-ts/lib/function";
 
 import type { NotFound, Route } from "~src/elm-ts/route";
@@ -29,15 +29,6 @@ describe("router", () => {
       fc.property(signUpPathArbitrary(), (pathname: string) => {
         expect(route.fromLocationPathname(pathname)).toEqual({
           _tag: "SignUp",
-        });
-      })
-    );
-  });
-  test("parses any other path as the not found route", () => {
-    fc.assert(
-      fc.property(notFoundPathArbitrary(), (pathname: string) => {
-        expect(route.fromLocationPathname(pathname)).toEqual({
-          _tag: "NotFound",
         });
       })
     );
@@ -76,15 +67,3 @@ const signInPathArbitrary: () => Arbitrary<string> = () =>
 const signUpPath: "sign-up" = "sign-up";
 const signUpPathArbitrary: () => Arbitrary<string> = () =>
   fc.constant(signUpPath);
-
-const notFoundPathArbitrary: () => Arbitrary<string> = () =>
-  fc
-    .webPath()
-    .filter(
-      (webPath: string): boolean =>
-        !(
-          array.exists((homePath: string): boolean =>
-            string.Eq.equals(webPath, homePath)
-          )(homePaths) || string.Eq.equals(webPath, signInPath)
-        )
-    );
