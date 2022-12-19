@@ -33,8 +33,8 @@ export const locationToMsg = (location: Location): Msg => ({
   route: route.fromLocationPathname(location.pathname),
 });
 
-const routeToModelCmd = (route: Route): [Model, Cmd<Msg>] =>
-  match<Route, [Model, Cmd<Msg>]>(route)
+const routeToModelCmd = (route_: Route): [Model, Cmd<Msg>] =>
+  match<Route, [Model, Cmd<Msg>]>(route_)
     .with({ _tag: "Home" }, () => [
       {
         _tag: "Home",

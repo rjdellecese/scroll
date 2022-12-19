@@ -30,13 +30,13 @@ pipe(
     >(stage.fromNodeEnv(process.env["NODE_ENV"]))
       .with({ _tag: "None" }, () => either.left("Failed to determine stage"))
       .with(
-        { _tag: "Some", value: P.select("stage", "Development") },
-        ({ stage }) =>
-          either.right({ stage, program: programWithDebuggerWithFlags })
+        { _tag: "Some", value: P.select("stage_", "Development") },
+        ({ stage_ }) =>
+          either.right({ stage: stage_, program: programWithDebuggerWithFlags })
       )
       .with(
-        { _tag: "Some", value: P.select("stage", "Production") },
-        ({ stage }) => {
+        { _tag: "Some", value: P.select("stage_", "Production") },
+        ({ stage_ }) => {
           Sentry.init({
             dsn: sentryConfig.dsn,
             tunnel: "/.netlify/functions/tunnel-to-sentry",
@@ -44,7 +44,7 @@ pipe(
             tracesSampleRate: 1.0,
           });
 
-          return either.right({ stage, program: programWithFlags });
+          return either.right({ stage: stage_, program: programWithFlags });
         }
       )
       .exhaustive()

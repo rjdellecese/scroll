@@ -158,10 +158,10 @@ export const update =
               )
               .with(
                 { _tag: "VersionedNoteReceived", versionedNote: P.select() },
-                (versionedNote) => [
+                (versionedNote_) => [
                   Lens.fromProp<LoadingNoteAndClientIdModel>()(
                     "optionVersionedNote"
-                  ).set(option.some(versionedNote))(
+                  ).set(option.some(versionedNote_))(
                     loadingNoteAndClientIdModel
                   ),
                   cmd.none,
@@ -249,9 +249,9 @@ export const update =
         ({ loadedMsg, loadedModel }) =>
           tuple.mapSnd<Cmd<LoadedMsg>, Cmd<Msg>>(
             cmd.map(
-              (loadedMsg): Msg => ({
+              (loadedMsg_): Msg => ({
                 _tag: "GotLoadedMsg",
-                msg: loadedMsg,
+                msg: loadedMsg_,
               })
             )
           )(
@@ -377,8 +377,8 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
     match(model)
       .with(
         { _tag: "LoadingNoteAndClientId", noteId: P.select() },
-        (noteId) => (
-          <LoadingNoteAndClientId dispatch={dispatch_} noteId={noteId} />
+        (noteId_) => (
+          <LoadingNoteAndClientId dispatch={dispatch_} noteId={noteId_} />
         )
       )
       .with({ _tag: "LoadingEditor" }, { _tag: "Loaded" }, (model_) => (
@@ -390,22 +390,22 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
             .with(
               { _tag: "LoadingEditor" },
               ({
-                versionedNote,
+                versionedNote: versionedNote_,
                 clientId,
               }): Parameters<typeof LoadingEditorOrLoaded>[0] => ({
                 dispatch: dispatch_,
                 currentTime,
-                noteId: versionedNote._id,
-                creationTime: versionedNote._creationTime,
-                initialProseMirrorDoc: versionedNote.proseMirrorDoc,
-                initialVersion: versionedNote.version,
+                noteId: versionedNote_._id,
+                creationTime: versionedNote_._creationTime,
+                initialProseMirrorDoc: versionedNote_.proseMirrorDoc,
+                initialVersion: versionedNote_.version,
                 clientId: clientId,
               })
             )
             .with(
               { _tag: "Loaded" },
               ({
-                noteId,
+                noteId: noteId_,
                 clientId,
                 creationTime,
                 initialProseMirrorDoc,
@@ -413,7 +413,7 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
               }): Parameters<typeof LoadingEditorOrLoaded>[0] => ({
                 dispatch: dispatch_,
                 currentTime,
-                noteId,
+                noteId: noteId_,
                 creationTime,
                 initialProseMirrorDoc,
                 initialVersion,
@@ -427,13 +427,13 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
 
 const LoadingNoteAndClientId = ({
   dispatch: dispatch_,
-  noteId,
+  noteId: noteId_,
 }: {
   dispatch: Dispatch<Msg>;
   noteId: Id<"notes">;
 }) => {
   const optionVersionedNote = option.fromNullable(
-    useQuery("getVersionedNote", noteId)
+    useQuery("getVersionedNote", noteId_)
   );
 
   useStableEffect(
@@ -461,7 +461,7 @@ const LoadingNoteAndClientId = ({
 const LoadingEditorOrLoaded = ({
   dispatch: dispatch_,
   currentTime,
-  noteId,
+  noteId: noteId_,
   creationTime,
   initialProseMirrorDoc,
   initialVersion,
@@ -529,7 +529,7 @@ const LoadingEditorOrLoaded = ({
     .with({ _tag: "None" }, () => initialVersion)
     .exhaustive();
 
-  const stepsSince = useQuery("getStepsSince", noteId, currentVersion);
+  const stepsSince = useQuery("getStepsSince", noteId_, currentVersion);
 
   React.useEffect(() => {
     pipe(
