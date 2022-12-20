@@ -4,7 +4,8 @@
   "scripts": {
     "start": "convex dev --once && concurrently --restart-tries=-1 --prefix-colors=\"black.bold.bgCyan,black.bold.bgYellow\" --prefix=\" {name} \" --names=\"PARCEL,CONVEX\" \"parcel serve src/elm-ts/index.html\" \"convex dev\"",
     "pretest": "concurrently --group --prefix-colors=\"black.bold.bgMagenta,black.bold.bgBlue,black.bold.bgCyan\" --prefix=\" {name} \" --names=\"PRETTIER,ESLINT,CONVEX + TSC\" \"prettier --check .\" \"eslint --max-warnings=0 .\" \"convex codegen && tsc -noEmit\"",
-    "test": "jest"
+    "test": "jest",
+    "posttest": "parcel build src/elm-ts/index.html"
   },
   "repository": {
     "type": "git",
