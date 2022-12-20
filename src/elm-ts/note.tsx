@@ -1,4 +1,4 @@
-import type { Editor } from "@tiptap/core";
+import type { Editor, JSONContent } from "@tiptap/core";
 import { Extension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import type { Editor as ReactEditor } from "@tiptap/react";
@@ -11,6 +11,7 @@ import type { Sub } from "elm-ts/lib/Sub";
 import { eq, io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
 import { constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
+import type { Json } from "fp-ts/lib/Json";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
 import type { Option } from "fp-ts/lib/Option";
 import {
@@ -63,7 +64,7 @@ type LoadedModel = {
   _tag: "Loaded";
   noteId: Id<"notes">;
   creationTime: number;
-  initialProseMirrorDoc: string;
+  initialProseMirrorDoc: Json;
   initialVersion: number;
   clientId: string;
   editor: Editor;
@@ -124,7 +125,7 @@ type LoadedMsg =
   | { _tag: "StepsSent" }
   | {
       _tag: "StepsReceived";
-      steps: NonEmptyArray<{ proseMirrorStep: string; clientId: string }>;
+      steps: NonEmptyArray<{ proseMirrorStep: Json; clientId: string }>;
     };
 
 export const update =
@@ -329,15 +330,15 @@ export const update =
 
 const receiveSteps: (
   editor: Editor,
-  steps: NonEmptyArray<{ proseMirrorStep: string; clientId: string }>
+  steps: NonEmptyArray<{ proseMirrorStep: Json; clientId: string }>
 ) => Cmd<never> = (editor, steps_) => {
   const { steps, clientIds } = nonEmptyArray.reduce<
-    { proseMirrorStep: string; clientId: string },
+    { proseMirrorStep: Json; clientId: string },
     { steps: Step[]; clientIds: string[] }
   >({ steps: [], clientIds: [] }, (result, step) => ({
     steps: [
       ...result.steps,
-      Step.fromJSON(editor.schema, JSON.parse(step.proseMirrorStep)),
+      Step.fromJSON(editor.schema, step.proseMirrorStep),
     ],
     clientIds: [...result.clientIds, step.clientId],
   }))(steps_);
@@ -365,9 +366,7 @@ const sendSteps = (
     loadedModel.noteId,
     loadedModel.clientId,
     version,
-    readonlyArray
-      .toArray(steps)
-      .map((step: Step) => JSON.stringify(step.toJSON()))
+    readonlyArray.toArray(steps).map((step: Step) => step.toJSON())
   );
 
 // VIEW
@@ -471,7 +470,7 @@ const LoadingEditorOrLoaded = ({
   currentTime: number;
   noteId: Id<"notes">;
   creationTime: number;
-  initialProseMirrorDoc: string;
+  initialProseMirrorDoc: Json;
   initialVersion: number;
   clientId: string;
 }): ReactElement => {
@@ -491,7 +490,7 @@ const LoadingEditorOrLoaded = ({
       scrollThreshold: scrollBounds,
     },
     // eslint-disable-next-line no-type-assertion/no-type-assertion
-    content: JSON.parse(initialProseMirrorDoc) as string,
+    content: initialProseMirrorDoc as JSONContent,
     extensions: [
       ...extensions,
       Placeholder.configure({
