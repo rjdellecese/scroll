@@ -1,3 +1,5 @@
+import type { Json } from "fp-ts/lib/Json";
+
 import type { Document, Id } from "./_generated/dataModel";
 import { query } from "./_generated/server";
 
@@ -6,7 +8,7 @@ export default query(
     { db, auth },
     noteId: Id<"notes">,
     version: number
-  ): Promise<{ proseMirrorStep: string; clientId: string }[]> =>
+  ): Promise<{ proseMirrorStep: Json; clientId: string }[]> =>
     auth.getUserIdentity().then((userIdentity) =>
       userIdentity
         ? db

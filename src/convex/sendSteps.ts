@@ -1,3 +1,4 @@
+import type { Json } from "fp-ts/lib/Json";
 import { Node } from "prosemirror-model";
 import { Step } from "prosemirror-transform";
 
@@ -12,7 +13,7 @@ export default mutation(
     noteId: Id<"notes">,
     clientId: string,
     clientPersistedVersion: number,
-    steps: string[]
+    steps: Json[]
   ): Promise<void> => {
     const note = await db.get(noteId);
     const userIdentity = await auth.getUserIdentity();
@@ -37,7 +38,7 @@ export default mutation(
         );
         const updatedParsedDoc = steps.reduce(
           (currentDoc, step, currentIndex) => {
-            const parsedStep = Step.fromJSON(schema, JSON.parse(step));
+            const parsedStep = Step.fromJSON(schema, step);
 
             db.insert("steps", {
               noteId,
