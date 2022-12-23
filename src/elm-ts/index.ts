@@ -75,3 +75,9 @@ pipe(
     }
   )
 );
+
+// https://parceljs.org/languages/javascript/#service-workers
+navigator.serviceWorker.register(
+  new URL("service-worker.ts", import.meta.url),
+  { type: "module" }
+);
