@@ -1,6 +1,3 @@
-import { either, json } from "fp-ts";
-import type { Json } from "fp-ts/lib/Json";
-
 import type { VersionedNote } from "../versioned-note";
 import type { Id } from "./_generated/dataModel";
 import { query } from "./_generated/server";
@@ -21,16 +18,10 @@ export default query(
 
       const version = await getNoteVersion(db, note._id);
 
-      return either.match(
-        () => {
-          throw "Failed to parse ProseMirror doc as JSON";
-        },
-        (proseMirrorDoc: Json): VersionedNote => ({
-          ...note,
-          proseMirrorDoc,
-          version,
-        })
-      )(json.parse(note.proseMirrorDoc));
+      return {
+        ...note,
+        version,
+      };
     } else {
       throw "Unauthenticated";
     }
