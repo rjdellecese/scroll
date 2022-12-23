@@ -5,7 +5,7 @@
   "start_url": ".",
   "scope": "/",
   "display": "standalone",
-  "theme_color": "#eab308",
+  "theme_color": "#a16207",
   "description": "Ye olde note-taking app.",
   "icons": [
     {
