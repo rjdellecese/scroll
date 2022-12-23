@@ -32,11 +32,8 @@ export default mutation(
           return;
         }
 
-        const parsedDoc = Node.fromJSON(
-          schema,
-          JSON.parse(note.proseMirrorDoc)
-        );
-        const updatedParsedDoc = steps.reduce(
+        const docNode = Node.fromJSON(schema, note.proseMirrorDoc);
+        const updatedDocNode = steps.reduce(
           (currentDoc, step, currentIndex) => {
             const parsedStep = Step.fromJSON(schema, step);
 
@@ -47,18 +44,18 @@ export default mutation(
               position: persistedVersion + currentIndex + 1,
             });
 
-            const nextDoc = parsedStep.apply(currentDoc).doc;
-            if (nextDoc) {
-              return nextDoc;
+            const nextDocNode = parsedStep.apply(currentDoc).doc;
+            if (nextDocNode) {
+              return nextDocNode;
             } else {
               throw "Failed to apply step";
             }
           },
-          parsedDoc
+          docNode
         );
 
         await db.patch(note._id, {
-          proseMirrorDoc: JSON.stringify(updatedParsedDoc.toJSON()),
+          proseMirrorDoc: updatedDocNode.toJSON(),
         });
       } else {
         throw "Not authenticated";
