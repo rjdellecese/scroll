@@ -8,7 +8,17 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import { eq, io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
+import {
+  array,
+  boolean,
+  eq,
+  function as function_,
+  io,
+  nonEmptyArray,
+  option,
+  readonlyArray,
+  tuple,
+} from "fp-ts";
 import { constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
 import type { Json } from "fp-ts/lib/Json";
@@ -33,6 +43,7 @@ import { useQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import * as dispatch from "~src/elm-ts/dispatch-extra";
+import * as htmlId from "~src/elm-ts/html-id";
 import * as logMessage from "~src/elm-ts/log-message";
 import { extensions } from "~src/tiptap-schema-extensions";
 import type { VersionedNote } from "~src/versioned-note";
@@ -261,7 +272,7 @@ export const update =
                 loadedModel,
                 pipe(
                   el,
-                  isBelowViewport,
+                  isBelowViewportOrAlmostEntirelyBeneathFooter,
                   io.map((isBelowViewport_) =>
                     match(isBelowViewport_)
                       .with(false, () =>
@@ -628,14 +639,28 @@ const LoadedEditor = ({
   );
 };
 
-const isBelowViewport: (el: Element) => IO<boolean> = (el) => () =>
-  pipe(
+const isBelowViewportOrAlmostEntirelyBeneathFooter: (
+  el: Element
+) => IO<boolean> = (el) => () => {
+  const isBelowViewport = (rect: DOMRect): boolean =>
+    rect.bottom > 0 &&
+    rect.top > (window.innerHeight || document.documentElement.clientHeight);
+
+  // https://stackoverflow.com/a/40877241
+  // "almost entirely" here means that it is more than 2 pixels below the footer
+  const isAlmostEntirelyBeneathFooter = (rect: DOMRect): boolean =>
+    array.foldMap(boolean.MonoidAny)(
+      (elFromPoint: Element) =>
+        elFromPoint.id === htmlId.toString(htmlId.footer)
+    )(document.elementsFromPoint(rect.left, rect.top - 2));
+
+  return pipe(
     el.getBoundingClientRect(),
-    (rect) =>
-      rect.bottom >
-        (window.innerHeight || document.documentElement.clientHeight) &&
-      rect.top < 0
+    function_
+      .getSemigroup(boolean.SemigroupAny)<DOMRect>()
+      .concat(isBelowViewport, isAlmostEntirelyBeneathFooter)
   );
+};
 
 // SUBSCRIPTIONS
 
