@@ -15,7 +15,6 @@
     "@parcel/packager-raw-url": "^2.7.0",
     "@parcel/transformer-webmanifest": "^2.7.0",
     "@parcel/validator-typescript": "^2.7.0",
-    "@tailwindcss/typography": "^0.5.8",
     "@tsconfig/node16-strictest": "^1.0.4",
     "@tsconfig/recommended": "^1.0.1",
     "@types/jest": "^29.2.5",
