@@ -39,9 +39,27 @@
   ol {
     @apply list-decimal;
   }
+  ol > li > ol {
+    @apply list-[lower-alpha];
+  }
+  ol > li > ol > li > ol {
+    @apply list-[lower-roman];
+  }
+  ol > li > ol > li > ol > li > ol {
+    @apply list-decimal;
+  }
+  ol > li > ol > li > ol > li > ol > li > ol {
+    @apply list-[lower-alpha];
+  }
+  ol > li > ol > li > ol > li > ol > li > ol > li > ol {
+    @apply list-[lower-roman];
+  }
+  ol > li > ol > li > ol > li > ol > li > ol > li > ol > li > ol {
+    @apply list-decimal;
+  }
   ul,
   ol {
-    @apply pl-4;
+    @apply pl-6;
   }
   ul > li,
   ol > li {
@@ -52,7 +70,7 @@
     @apply my-0;
   }
   ul[data-type="taskList"] {
-    @apply pl-0 list-none;
+    @apply pl-1 list-none;
   }
   ul[data-type="taskList"] ul:not([data-type="taskList"]) {
     @apply list-disc;
