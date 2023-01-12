@@ -81,6 +81,6 @@
     "react-dom": "^18.2.0",
     "react-intersection-observer": "^9.4.1",
     "rxjs": "^7.8.0",
-    "ts-pattern": "^4.0.6"
+    "ts-pattern": "^4.1.3"
   }
 }
