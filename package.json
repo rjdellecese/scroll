@@ -12,7 +12,7 @@
     "url": "git+https://github.com/rjdellecese/scroll.git"
   },
   "devDependencies": {
-    "@parcel/packager-raw-url": "^2.7.0",
+    "@parcel/packager-raw-url": "^2.8.2",
     "@parcel/transformer-webmanifest": "^2.7.0",
     "@parcel/validator-typescript": "^2.7.0",
     "@tsconfig/node16-strictest": "^1.0.4",
