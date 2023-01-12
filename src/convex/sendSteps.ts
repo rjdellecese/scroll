@@ -1,4 +1,3 @@
-import type { Json } from "fp-ts/lib/Json";
 import { Node } from "prosemirror-model";
 import { Step } from "prosemirror-transform";
 
@@ -13,7 +12,7 @@ export default mutation(
     noteId: Id<"notes">,
     clientId: string,
     clientPersistedVersion: number,
-    steps: Json[]
+    steps: string[]
   ): Promise<void> => {
     const note = await db.get(noteId);
     const userIdentity = await auth.getUserIdentity();
@@ -32,10 +31,10 @@ export default mutation(
           return;
         }
 
-        const docNode = Node.fromJSON(schema, note.proseMirrorDoc);
+        const docNode = Node.fromJSON(schema, JSON.parse(note.proseMirrorDoc));
         const updatedDocNode = steps.reduce(
           (currentDoc, step, currentIndex) => {
-            const parsedStep = Step.fromJSON(schema, step);
+            const parsedStep = Step.fromJSON(schema, JSON.parse(step));
 
             db.insert("steps", {
               noteId,
@@ -55,7 +54,7 @@ export default mutation(
         );
 
         await db.patch(note._id, {
-          proseMirrorDoc: updatedDocNode.toJSON(),
+          proseMirrorDoc: JSON.stringify(updatedDocNode.toJSON()),
         });
       } else {
         throw "Not authenticated";
