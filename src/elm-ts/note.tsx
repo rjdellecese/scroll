@@ -1,4 +1,4 @@
-import type { Editor, JSONContent } from "@tiptap/core";
+import type { Editor } from "@tiptap/core";
 import { Extension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import type { Editor as ReactEditor } from "@tiptap/react";
