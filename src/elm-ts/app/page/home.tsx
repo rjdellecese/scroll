@@ -21,6 +21,7 @@ import { usePaginatedQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import * as dispatch from "~src/elm-ts/dispatch-extra";
+import * as htmlId from "~src/elm-ts/html-id";
 import { LoadingSpinner } from "~src/elm-ts/loading-spinner";
 import type { LogMessage } from "~src/elm-ts/log-message";
 import * as logMessage from "~src/elm-ts/log-message";
@@ -381,11 +382,11 @@ const View = ({
   );
 
   return (
-    <>
-      <div className="sticky top-0 h-12 z-50 px-4 py-2 flex flex-row content-center justify-end border-b border-b-stone-300 bg-stone-50">
+    <div className="h-screen flex flex-col">
+      <div className="fixed top-0 h-12 w-full z-50 px-4 py-2 flex flex-row content-center justify-end border-b border-b-stone-300 bg-stone-50">
         <UserButton appearance={{ elements: { rootBox: "self-center" } }} />
       </div>
-      <div className="flex flex-col items-center mt-4">
+      <div className="flex flex-col grow items-center mt-4">
         <div className="flex flex-col grow justify-end max-w-3xl w-full mt-6">
           {match<Model, Html<Msg>>(model)
             .with({ _tag: "LoadingNotes" }, () => loadingNotes)
@@ -411,7 +412,7 @@ const View = ({
         .with({ _tag: "LoadingNotes" }, () => null)
         .with({ _tag: "LoadedNotes" }, () => createNoteButton(dispatch_))
         .exhaustive()}
-    </>
+    </div>
   );
 };
 
@@ -477,7 +478,10 @@ const loadedNotes: ({
 const noNotes: Html<Msg> = () => <div className="flex-grow" />;
 
 const createNoteButton: Html<Msg> = (dispatch_) => (
-  <div className="sticky flex flex-row justify-center w-full bottom-0 px-8 py-4 bg-white z-20 border-t border-stone-300">
+  <div
+    id={htmlId.toString(htmlId.footer)}
+    className="sticky flex flex-row justify-center w-full bottom-0 px-8 py-4 bg-white z-20 border-t border-stone-300"
+  >
     <button
       className="w-full max-w-3xl p-4 text-xl font-bold text-yellow-600 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 active:text-yellow-50 active:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 border-2 border-yellow-600 rounded-lg transition duration-100"
       onClick={() => dispatch_({ _tag: "CreateNoteButtonClicked" })}
