@@ -11,7 +11,7 @@ import type { Option } from "fp-ts/lib/Option";
 import { useStableEffect } from "fp-ts-react-stable-hooks";
 import { Filter, LucideArrowDown, Plus, SearchIcon } from "lucide-react";
 import { Lens } from "monocle-ts";
-import type { Dispatch, ReactElement, ReactNode } from "react";
+import type { Dispatch, ReactElement } from "react";
 import React from "react";
 import { InView } from "react-intersection-observer";
 import { match, P } from "ts-pattern";
