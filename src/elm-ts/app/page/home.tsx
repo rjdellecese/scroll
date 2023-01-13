@@ -9,6 +9,7 @@ import { apply, constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { Either } from "fp-ts/lib/Either";
 import type { Option } from "fp-ts/lib/Option";
 import { useStableEffect } from "fp-ts-react-stable-hooks";
+import { Filter, LucideArrowDown, Plus, SearchIcon } from "lucide-react";
 import { Lens } from "monocle-ts";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
@@ -383,11 +384,8 @@ const View = ({
 
   return (
     <div className="h-screen flex flex-col">
-      <div className="fixed top-0 h-12 w-full z-50 px-4 py-2 flex flex-row content-center justify-end border-b border-b-stone-300 bg-stone-50">
-        <UserButton appearance={{ elements: { rootBox: "self-center" } }} />
-      </div>
-      <div className="flex flex-col grow items-center mt-4">
-        <div className="flex flex-col grow justify-end max-w-3xl w-full mt-6">
+      <div className="flex flex-col grow items-center">
+        <div className="flex flex-col grow justify-end max-w-3xl w-full">
           {match<Model, Html<Msg>>(model)
             .with({ _tag: "LoadingNotes" }, () => loadingNotes)
             .with({ _tag: "LoadedNotes" }, ({ noteModels, loadMore }) =>
@@ -410,7 +408,7 @@ const View = ({
       </div>
       {match(model)
         .with({ _tag: "LoadingNotes" }, () => null)
-        .with({ _tag: "LoadedNotes" }, () => createNoteButton(dispatch_))
+        .with({ _tag: "LoadedNotes" }, () => footer(dispatch_))
         .exhaustive()}
     </div>
   );
@@ -440,7 +438,7 @@ const loadedNotes: ({
             }
           >
             {({ ref }) => (
-              <div ref={ref} className="flex place-content-center pt-8 pb-16">
+              <div ref={ref} className="flex place-content-center py-16">
                 {match(canLoadMore)
                   .with(true, () => <LoadingSpinner />)
                   .with(false, () => (
@@ -477,18 +475,46 @@ const loadedNotes: ({
 
 const noNotes: Html<Msg> = () => <div className="flex-grow" />;
 
-const createNoteButton: Html<Msg> = (dispatch_) => (
+const footer: Html<Msg> = (dispatch_) => (
   <div
     id={htmlId.toString(htmlId.footer)}
-    className="sticky flex flex-row justify-center w-full bottom-0 px-8 py-4 bg-white z-20 border-t border-stone-300"
+    className="sticky flex flex-row justify-center w-full bottom-0 py-2 bg-yellow-50 z-20 border-t border-yellow-300"
   >
-    <button
-      className="w-full max-w-3xl p-4 text-xl font-bold text-yellow-600 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 active:text-yellow-50 active:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 border-2 border-yellow-600 rounded-lg transition duration-100"
-      onClick={() => dispatch_({ _tag: "CreateNoteButtonClicked" })}
-    >
-      Create Note
-    </button>
+    <div className="flex flex-row justify-between w-full max-w-3xl px-8">
+      <div className="flex flex-row space-x-2">
+        <FooterButton
+          onClick={() => dispatch_({ _tag: "CreateNoteButtonClicked" })}
+        >
+          <Plus />
+        </FooterButton>
+        <FooterButton>
+          <LucideArrowDown />
+        </FooterButton>
+        <FooterButton>
+          <SearchIcon />
+        </FooterButton>
+        <FooterButton>
+          <Filter />
+        </FooterButton>
+      </div>
+      <UserButton />
+    </div>
   </div>
+);
+
+const FooterButton = (
+  props: Omit<
+    React.DetailedHTMLProps<
+      React.ButtonHTMLAttributes<HTMLButtonElement>,
+      HTMLButtonElement
+    >,
+    "className"
+  >
+): ReactElement => (
+  <button
+    {...props}
+    className="text-xl font-bold p-1 text-yellow-700 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 active:text-yellow-50 active:bg-yellow-500 focus:outline-none focus:ring focus:ring-offset focus:ring-yellow-500 rounded transition duration-100"
+  />
 );
 
 // SUBSCRIPTIONS
