@@ -478,7 +478,7 @@ const noNotes: Html<Msg> = () => <div className="flex-grow" />;
 const footer: Html<Msg> = (dispatch_) => (
   <div
     id={htmlId.toString(htmlId.footer)}
-    className="sticky flex flex-row justify-center w-full bottom-0 py-2 bg-yellow-50 z-20 border-t border-yellow-300"
+    className="sticky flex flex-row justify-center w-full bottom-0 pt-2 pb-6 bg-yellow-50 z-20 border-t border-yellow-300"
   >
     <div className="flex flex-row justify-between w-full max-w-3xl px-8">
       <div className="flex flex-row space-x-2">
