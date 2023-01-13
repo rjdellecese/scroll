@@ -486,20 +486,17 @@ const LoadingEditorOrLoaded = ({
   initialVersion: number;
   clientId: string;
 }): ReactElement => {
-  // I measured this manually in Chrome. This is obviously brittle, but also probably good enough for now.
-  const scrollBounds = { top: 0, bottom: 96, left: 0, right: 0 };
-
   const editor = useEditor({
     editorProps: {
       attributes: {
         class: "px-8 pt-4 pb-12 focus:outline-none",
       },
       scrollMargin: {
-        ...scrollBounds,
-        top: scrollBounds.top + 42,
-        bottom: scrollBounds.bottom + 42,
+        top: 176,
+        bottom: 176,
+        left: 0,
+        right: 0,
       },
-      scrollThreshold: scrollBounds,
     },
     // eslint-disable-next-line no-type-assertion/no-type-assertion
     content: JSON.parse(initialProseMirrorDoc),
