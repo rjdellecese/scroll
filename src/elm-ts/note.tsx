@@ -487,7 +487,7 @@ const LoadingEditorOrLoaded = ({
   clientId: string;
 }): ReactElement => {
   // I measured this manually in Chrome. This is obviously brittle, but also probably good enough for now.
-  const scrollBounds = { top: 48, bottom: 96, left: 0, right: 0 };
+  const scrollBounds = { top: 0, bottom: 96, left: 0, right: 0 };
 
   const editor = useEditor({
     editorProps: {
@@ -632,7 +632,7 @@ const LoadedEditor = ({
 
   return (
     <div ref={ref} className="flex flex-col">
-      <div className="flex justify-between sticky px-8 top-12 font-light text-stone-500 bg-white z-10 border-b border-stone-300">
+      <div className="flex justify-between sticky px-8 top-0 font-light text-stone-500 bg-white z-10 border-b border-stone-300">
         <span>{formattedCreationTime}</span>
       </div>
       <EditorContent editor={editor} />
