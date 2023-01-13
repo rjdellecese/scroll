@@ -513,7 +513,7 @@ const FooterButton = (
 ): ReactElement => (
   <button
     {...props}
-    className="text-xl font-bold p-1 text-yellow-700 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 active:text-yellow-50 active:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 rounded transition duration-100"
+    className="text-xl font-bold p-1 text-yellow-700 bg-yellow-50 hover:text-yellow-50 hover:bg-yellow-600 active:text-yellow-50 active:bg-yellow-500 focus:outline-none focus:ring focus:ring-offset focus:ring-yellow-500 rounded transition duration-100"
   />
 );
 
