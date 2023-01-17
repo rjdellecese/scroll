@@ -34,6 +34,7 @@ import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
+import { useInView } from "react-intersection-observer";
 import { match, P } from "ts-pattern";
 
 import type { API } from "~src/convex/_generated/api";
@@ -79,6 +80,7 @@ type LoadedModel = {
   clientId: string;
   editor: Editor;
   areStepsInFlight: boolean;
+  isInView: boolean;
 };
 
 export const init = (noteId: Id<"notes">): [Model, Cmd<Msg>] => [
@@ -110,6 +112,13 @@ export const noteId = (model: Model): Id<"notes"> =>
     .with({ _tag: "Loaded", noteId: P.select() }, identity)
     .exhaustive();
 
+export const isInView = (model: Model): boolean =>
+  match(model)
+    .with({ _tag: "LoadingNoteAndClientId" }, () => false)
+    .with({ _tag: "LoadingEditor" }, () => false)
+    .with({ _tag: "Loaded", isInView: P.select() }, identity)
+    .exhaustive();
+
 // UPDATE
 
 export type Msg =
@@ -131,6 +140,7 @@ type LoadingEditorMsg = {
 
 type LoadedMsg =
   | { _tag: "ComponentDidMount"; el: HTMLDivElement }
+  | { _tag: "InViewStatusChanged"; inView: boolean }
   | { _tag: "EditorTransactionApplied" }
   | { _tag: "StepsSent" }
   | {
@@ -242,6 +252,7 @@ export const update =
                     clientId: loadingEditorModel.clientId,
                     editor,
                     areStepsInFlight: false,
+                    isInView: false,
                   },
                   cmd.none,
                 ]
@@ -284,6 +295,15 @@ export const update =
                   cmdExtra.scheduleForNextAnimationFrame
                 ),
               ])
+              .with(
+                { _tag: "InViewStatusChanged", inView: P.select() },
+                (inView) => [
+                  Lens.fromProp<LoadedModel>()("isInView").set(inView)(
+                    loadedModel
+                  ),
+                  cmd.none,
+                ]
+              )
               .with({ _tag: "EditorTransactionApplied" }, () =>
                 match<boolean, [LoadedModel, Cmd<LoadedMsg>]>(
                   loadedModel.areStepsInFlight
@@ -585,11 +605,11 @@ const LoadedEditor = ({
   creationTime: number;
   editor: ReactEditor;
 }) => {
-  const ref: React.Ref<HTMLDivElement> = React.useRef(null);
+  const componentDidMountRef = React.useRef<HTMLDivElement | null>(null);
 
   useStableLayoutEffect(
     () => {
-      match(option.fromNullable(ref.current))
+      match(option.fromNullable(componentDidMountRef.current))
         .with({ _tag: "Some", value: P.select() }, (value) =>
           dispatch_({
             _tag: "GotLoadedMsg",
@@ -601,6 +621,18 @@ const LoadedEditor = ({
     },
     [dispatch_],
     eq.tuple(dispatch.getEq<Msg>())
+  );
+
+  const { ref: inViewRef, inView } = useInView();
+
+  useStableEffect(
+    () =>
+      dispatch_({
+        _tag: "GotLoadedMsg",
+        msg: { _tag: "InViewStatusChanged", inView },
+      }),
+    [dispatch_, inView],
+    eq.tuple(dispatch.getEq<Msg>(), boolean.Eq)
   );
 
   const creationDateTime = DateTime.fromMillis(creationTime);
@@ -628,7 +660,13 @@ const LoadedEditor = ({
     );
 
   return (
-    <div ref={ref} className="flex flex-col">
+    <div
+      ref={(node) => {
+        componentDidMountRef.current = node;
+        inViewRef(node);
+      }}
+      className="flex flex-col"
+    >
       <div className="flex justify-between sticky px-8 top-0 font-light text-stone-500 bg-white z-10 border-b border-stone-300">
         <span>{formattedCreationTime}</span>
       </div>
