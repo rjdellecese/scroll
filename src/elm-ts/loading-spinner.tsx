@@ -5,8 +5,5 @@ import React from "react";
 type Props = SVGProps<SVGSVGElement>;
 
 export const LoadingSpinner = (props: Props): ReactElement => (
-  <Loader2
-    {...props}
-    className={`animate-spin -ml-1 mr-3 h-5 w-5 ${props.className || ""}`}
-  />
+  <Loader2 {...props} className={`animate-spin ${props.className || ""}`} />
 );

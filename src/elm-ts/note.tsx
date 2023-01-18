@@ -80,8 +80,10 @@ type LoadedModel = {
   clientId: string;
   editor: Editor;
   areStepsInFlight: boolean;
-  isInView: boolean;
+  optionIntersectionStatus: Option<IntersectionStatus>;
 };
+
+type IntersectionStatus = "InView" | "Above" | "Below";
 
 export const init = (noteId: Id<"notes">): [Model, Cmd<Msg>] => [
   {
@@ -112,11 +114,32 @@ export const noteId = (model: Model): Id<"notes"> =>
     .with({ _tag: "Loaded", noteId: P.select() }, identity)
     .exhaustive();
 
-export const isInView = (model: Model): boolean =>
+export const creationTime = (model: Model): Option<number> =>
   match(model)
-    .with({ _tag: "LoadingNoteAndClientId" }, () => false)
-    .with({ _tag: "LoadingEditor" }, () => false)
-    .with({ _tag: "Loaded", isInView: P.select() }, identity)
+    .with(
+      { _tag: "LoadingNoteAndClientId", optionVersionedNote: P.select() },
+      option.map(({ _creationTime }: VersionedNote) => _creationTime)
+    )
+    .with(
+      { _tag: "LoadingEditor", versionedNote: { _creationTime: P.select() } },
+      option.some
+    )
+    .with({ _tag: "Loaded", creationTime: P.select() }, option.some)
+    .exhaustive();
+
+// `option.none` indicates that the note has not loaded yet
+export const isInView = (model: Model): Option<boolean> =>
+  match(model)
+    .with({ _tag: "LoadingNoteAndClientId" }, () => option.none)
+    .with({ _tag: "LoadingEditor" }, () => option.none)
+    .with(
+      { _tag: "Loaded", optionIntersectionStatus: P.select() },
+      option.map((intersectionStatus) =>
+        match(intersectionStatus)
+          .with("InView", () => true)
+          .otherwise(() => false)
+      )
+    )
     .exhaustive();
 
 // UPDATE
@@ -140,7 +163,11 @@ type LoadingEditorMsg = {
 
 type LoadedMsg =
   | { _tag: "ComponentDidMount"; el: HTMLDivElement }
-  | { _tag: "InViewStatusChanged"; inView: boolean }
+  | { _tag: "ComponentWillUnmount"; el: HTMLDivElement }
+  | {
+      _tag: "IntersectionStatusChanged";
+      intersectionStatus: IntersectionStatus;
+    }
   | { _tag: "EditorTransactionApplied" }
   | { _tag: "StepsSent" }
   | {
@@ -252,7 +279,7 @@ export const update =
                     clientId: loadingEditorModel.clientId,
                     editor,
                     areStepsInFlight: false,
-                    isInView: false,
+                    optionIntersectionStatus: option.none,
                   },
                   cmd.none,
                 ]
@@ -282,25 +309,70 @@ export const update =
                 loadedModel,
                 pipe(
                   el,
-                  isBelowViewportOrAlmostEntirelyBeneathFooter,
-                  io.map((isBelowViewport_) =>
-                    match(isBelowViewport_)
-                      .with(false, () =>
-                        window.scrollBy({ top: el.offsetHeight })
+                  isAboveViewport,
+                  io.map((isInViewport_) =>
+                    match(isInViewport_)
+                      .with(
+                        true,
+                        // TODO?
+                        () => window.scrollBy({ top: el.offsetHeight })
                       )
-                      .with(true, constVoid)
+                      .with(false, constVoid)
                       .exhaustive()
                   ),
                   cmdExtra.fromIOVoid,
                   cmdExtra.scheduleForNextAnimationFrame
                 ),
               ])
+              .with({ _tag: "ComponentWillUnmount", el: P.select() }, (el) => [
+                loadedModel,
+                match(loadedModel.optionIntersectionStatus)
+                  .with({ _tag: "None" }, () => cmd.none)
+                  .with(
+                    { _tag: "Some", value: P.select() },
+                    (intersectionStatus) =>
+                      match(intersectionStatus)
+                        .with("InView", () => cmd.none)
+                        .with("Above", () => cmd.none)
+                        .with("Below", () => cmd.none)
+                        .exhaustive()
+                  )
+                  .exhaustive(),
+                // TODO
+                // pipe(
+                //   el,
+                //   function_
+                //     .getSemigroup(
+                //       io.getSemigroup(boolean.SemigroupAny)
+                //     )<Element>()
+                //     .concat(isAboveViewport, isInViewport),
+                //   io.map((isAboveViewport_) =>
+                //     match(isAboveViewport_)
+                //       .with(
+                //         true,
+                //         // TODO?
+                //         () => {
+                //           console.log("scrolled");
+                //           console.log("offset", el.offsetHeight);
+                //           window.scrollBy({ top: -el.offsetHeight });
+                //         }
+                //       )
+                //       .with(false, constVoid)
+                //       .exhaustive()
+                //   ),
+                //   cmdExtra.fromIOVoid,
+                //   cmdExtra.scheduleForNextAnimationFrame
+                // ),
+              ])
               .with(
-                { _tag: "InViewStatusChanged", inView: P.select() },
-                (inView) => [
-                  Lens.fromProp<LoadedModel>()("isInView").set(inView)(
-                    loadedModel
-                  ),
+                {
+                  _tag: "IntersectionStatusChanged",
+                  intersectionStatus: P.select(),
+                },
+                (intersectionStatus) => [
+                  Lens.fromProp<LoadedModel>()("optionIntersectionStatus").set(
+                    option.some(intersectionStatus)
+                  )(loadedModel),
                   cmd.none,
                 ]
               )
@@ -438,14 +510,14 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
               ({
                 noteId: noteId_,
                 clientId,
-                creationTime,
+                creationTime: creationTime_,
                 initialProseMirrorDoc,
                 initialVersion,
               }): Parameters<typeof LoadingEditorOrLoaded>[0] => ({
                 dispatch: dispatch_,
                 currentTime,
                 noteId: noteId_,
-                creationTime,
+                creationTime: creationTime_,
                 initialProseMirrorDoc,
                 initialVersion,
                 clientId,
@@ -493,7 +565,7 @@ const LoadingEditorOrLoaded = ({
   dispatch: dispatch_,
   currentTime,
   noteId: noteId_,
-  creationTime,
+  creationTime: creationTime_,
   initialProseMirrorDoc,
   initialVersion,
   clientId,
@@ -512,6 +584,12 @@ const LoadingEditorOrLoaded = ({
         class: "px-8 pt-4 pb-12 focus:outline-none",
       },
       scrollMargin: {
+        top: 176,
+        bottom: 176,
+        left: 0,
+        right: 0,
+      },
+      scrollThreshold: {
         top: 176,
         bottom: 176,
         left: 0,
@@ -586,7 +664,7 @@ const LoadingEditorOrLoaded = ({
     <LoadedEditor
       dispatch={dispatch_}
       currentTime={currentTime}
-      creationTime={creationTime}
+      creationTime={creationTime_}
       editor={editor}
     />
   ) : (
@@ -597,7 +675,7 @@ const LoadingEditorOrLoaded = ({
 const LoadedEditor = ({
   dispatch: dispatch_,
   currentTime,
-  creationTime,
+  creationTime: creationTime_,
   editor,
 }: {
   dispatch: Dispatch<Msg>;
@@ -608,34 +686,148 @@ const LoadedEditor = ({
   const componentDidMountRef = React.useRef<HTMLDivElement | null>(null);
 
   useStableLayoutEffect(
-    () => {
+    () =>
       match(option.fromNullable(componentDidMountRef.current))
-        .with({ _tag: "Some", value: P.select() }, (value) =>
+        .with({ _tag: "Some", value: P.select() }, (value) => {
           dispatch_({
             _tag: "GotLoadedMsg",
             msg: { _tag: "ComponentDidMount", el: value },
-          })
-        )
+          });
+        })
         .with({ _tag: "None" }, constVoid)
-        .exhaustive();
-    },
+        .exhaustive(),
     [dispatch_],
     eq.tuple(dispatch.getEq<Msg>())
   );
 
-  const { ref: inViewRef, inView } = useInView();
+  const { ref: inViewRef, entry } = useInView();
 
   useStableEffect(
-    () =>
-      dispatch_({
-        _tag: "GotLoadedMsg",
-        msg: { _tag: "InViewStatusChanged", inView },
-      }),
-    [dispatch_, inView],
-    eq.tuple(dispatch.getEq<Msg>(), boolean.Eq)
+    () => {
+      if (entry) {
+        dispatch_({
+          _tag: "GotLoadedMsg",
+          msg: {
+            _tag: "IntersectionStatusChanged",
+            intersectionStatus: entryToIntersectionStatus(entry),
+          },
+        });
+      }
+    },
+    [dispatch_, entry],
+    eq.tuple(dispatch.getEq<Msg>(), {
+      equals: (
+        entry1: IntersectionObserverEntry | undefined,
+        entry2: IntersectionObserverEntry | undefined
+      ) =>
+        match<
+          [
+            IntersectionObserverEntry | undefined,
+            IntersectionObserverEntry | undefined
+          ],
+          boolean
+        >([entry1, entry2])
+          .with([undefined, undefined], () => true)
+          .with(
+            [P.select("entry1_"), P.select("entry2_")],
+            ({ entry1_, entry2_ }) =>
+              !entry1_ || !entry2_
+                ? false
+                : entryToIntersectionStatus(entry1_) ===
+                  entryToIntersectionStatus(entry2_)
+          )
+          .exhaustive(),
+    })
   );
 
-  const creationDateTime = DateTime.fromMillis(creationTime);
+  React.useLayoutEffect(
+    () => () => {
+      console.log("component will unmount");
+      const el = componentDidMountRef.current;
+
+      if (el) {
+        if (entry) {
+          console.log("el.offsetHeight", el.offsetHeight);
+          match<IntersectionStatus, void>(entryToIntersectionStatus(entry))
+            .with("Above", () => window.scrollBy({ top: -el.offsetHeight }))
+            // .with("Below", () => window.scrollBy({ top: el.offsetHeight }))
+            .with("Below", () => constVoid)
+            .with("InView", constVoid)
+            .exhaustive();
+        }
+
+        // dispatch_({
+        //   _tag: "GotLoadedMsg",
+        //   msg: {
+        //     _tag: "ComponentWillUnmount",
+        //     el,
+        //   },
+        // });
+      }
+
+      // if (el) {
+      //   pipe(
+      //     el,
+      //     // function_
+      //     //   .getSemigroup(io.getSemigroup(boolean.SemigroupAny))<Element>()
+      //     //   .concat(isAboveViewport, isInViewport),
+      //     isAboveViewport,
+      //     io.chain((isAboveViewport_) =>
+      //       match(isAboveViewport_)
+      //         .with(
+      //           true,
+      //           // TODO?
+      //           () => () => {
+      //             console.log("scrolled");
+      //             console.log("offset", el.offsetHeight);
+      //             window.scrollBy({ top: -el.offsetHeight });
+      //           }
+      //         )
+      //         .with(false, () => isInOrBelowViewport)
+      //         .exhaustive()
+      //     )
+      //   )()
+      // }
+      // match(option.fromNullable(componentDidMountRef.current))
+      //   .with({ _tag: "Some", value: P.select() }, (el) =>
+      //     pipe(
+      //       el,
+      //       // function_
+      //       //   .getSemigroup(io.getSemigroup(boolean.SemigroupAny))<Element>()
+      //       //   .concat(isAboveViewport, isInViewport),
+      //       isAboveViewport,
+      //       io.map((isAboveViewport_) =>
+      //         match(isAboveViewport_)
+      //           .with(
+      //             true,
+      //             // TODO?
+      //             () => {
+      //               console.log("scrolled");
+      //               console.log("offset", el.offsetHeight);
+      //               window.scrollBy({ top: -el.offsetHeight });
+      //             }
+      //           )
+      //           .with(false, constVoid)
+      //           .exhaustive()
+      //       )
+      //     )()
+      //   )
+      //   .with({ _tag: "None" }, constVoid)
+      //   .exhaustive();
+    },
+    [entry]
+    // [dispatch_, componentDidMountRef],
+    // eq.tuple(dispatch.getEq<Msg>(), {
+    //   equals: (
+    //     mutRef1: React.MutableRefObject<HTMLDivElement | null>,
+    //     mutRef2: React.MutableRefObject<HTMLDivElement | null>
+    //   ) =>
+    //     (mutRef1.current === null && mutRef2.current === null) ||
+    //     (mutRef1.current !== null && mutRef2.current !== null),
+    // })
+  );
+
+  const creationDateTime = DateTime.fromMillis(creationTime_);
 
   const formattedCreationTime = match<Duration, string>(
     DateTime.fromMillis(currentTime).diff(creationDateTime)
@@ -675,6 +867,19 @@ const LoadedEditor = ({
   );
 };
 
+const entryToIntersectionStatus = (
+  entry: IntersectionObserverEntry
+): IntersectionStatus =>
+  match<boolean, IntersectionStatus>(entry.isIntersecting)
+    .with(true, () => "InView")
+    .with(false, () =>
+      match<boolean, IntersectionStatus>(entry.boundingClientRect.top > 0)
+        .with(true, () => "Below")
+        .with(false, () => "Above")
+        .exhaustive()
+    )
+    .exhaustive();
+
 const isBelowViewportOrAlmostEntirelyBeneathFooter: (
   el: Element
 ) => IO<boolean> = (el) => () => {
@@ -697,6 +902,40 @@ const isBelowViewportOrAlmostEntirelyBeneathFooter: (
       .concat(isBelowViewport, isAlmostEntirelyBeneathFooter)
   );
 };
+
+const isInViewport =
+  (el: Element): IO<boolean> =>
+  () =>
+    pipe(
+      el.getBoundingClientRect(),
+      (rect) =>
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <=
+          (window.innerHeight || document.documentElement.clientHeight) &&
+        rect.right <=
+          (window.innerWidth || document.documentElement.clientWidth)
+    );
+
+const isAboveViewport =
+  (el: Element): IO<boolean> =>
+  () =>
+    pipe(
+      el.getBoundingClientRect(),
+      (rect) =>
+        rect.bottom <=
+        (window.innerHeight || document.documentElement.clientHeight)
+    );
+
+const isBelowViewport =
+  (el: Element): IO<boolean> =>
+  () =>
+    pipe(
+      el.getBoundingClientRect(),
+      (rect) =>
+        rect.top >=
+        (window.innerHeight || document.documentElement.clientHeight)
+    );
 
 // SUBSCRIPTIONS
 
