@@ -50,7 +50,7 @@
   },
   "dependencies": {
     "@clerk/clerk-react": "^4.7.1",
-    "@fontsource/jetbrains-mono": "^4.5.11",
+    "@fontsource/jetbrains-mono": "^4.5.12",
     "@fontsource/lora": "^4.5.12",
     "@fontsource/mulish": "^4.5.13",
     "@netlify/functions": "^1.4.0",
