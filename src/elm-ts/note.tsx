@@ -8,17 +8,7 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import {
-  array,
-  boolean,
-  eq,
-  function as function_,
-  io,
-  nonEmptyArray,
-  option,
-  readonlyArray,
-  tuple,
-} from "fp-ts";
+import { eq, io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
 import { constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
@@ -34,6 +24,7 @@ import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
 import type { Dispatch, ReactElement } from "react";
 import React from "react";
+import { useInView } from "react-intersection-observer";
 import { match, P } from "ts-pattern";
 
 import type { API } from "~src/convex/_generated/api";
@@ -42,7 +33,6 @@ import { useQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import * as dispatch from "~src/elm-ts/dispatch-extra";
-import * as htmlId from "~src/elm-ts/html-id";
 import * as logMessage from "~src/elm-ts/log-message";
 import { extensions } from "~src/tiptap-schema-extensions";
 import type { VersionedNote } from "~src/versioned-note";
@@ -79,7 +69,13 @@ type LoadedModel = {
   clientId: string;
   editor: Editor;
   areStepsInFlight: boolean;
+  optionIntersectionStatus: Option<IntersectionStatus>;
 };
+
+type IntersectionStatus =
+  | "PartiallyOrEntirelyInView"
+  | "EntirelyAbove"
+  | "EntirelyBelow";
 
 export const init = (noteId: Id<"notes">): [Model, Cmd<Msg>] => [
   {
@@ -110,6 +106,41 @@ export const noteId = (model: Model): Id<"notes"> =>
     .with({ _tag: "Loaded", noteId: P.select() }, identity)
     .exhaustive();
 
+export const creationTime = (model: Model): Option<number> =>
+  match(model)
+    .with(
+      { _tag: "LoadingNoteAndClientId", optionVersionedNote: P.select() },
+      option.map(({ _creationTime }: VersionedNote) => _creationTime)
+    )
+    .with(
+      { _tag: "LoadingEditor", versionedNote: { _creationTime: P.select() } },
+      option.some
+    )
+    .with({ _tag: "Loaded", creationTime: P.select() }, option.some)
+    .exhaustive();
+
+// `option.none` indicates that the note has not loaded yet
+export const isInView = (model: Model): Option<boolean> =>
+  match(model)
+    .with({ _tag: "LoadingNoteAndClientId" }, () => option.none)
+    .with({ _tag: "LoadingEditor" }, () => option.none)
+    .with(
+      { _tag: "Loaded", optionIntersectionStatus: P.select() },
+      option.map((intersectionStatus) =>
+        match(intersectionStatus)
+          .with("PartiallyOrEntirelyInView", () => true)
+          .otherwise(() => false)
+      )
+    )
+    .exhaustive();
+
+export const isLoaded = (model: Model): boolean =>
+  match(model)
+    .with({ _tag: "LoadingNoteAndClientId" }, () => false)
+    .with({ _tag: "LoadingEditor" }, () => false)
+    .with({ _tag: "Loaded" }, () => true)
+    .exhaustive();
+
 // UPDATE
 
 export type Msg =
@@ -131,6 +162,10 @@ type LoadingEditorMsg = {
 
 type LoadedMsg =
   | { _tag: "ComponentDidMount"; el: HTMLDivElement }
+  | {
+      _tag: "IntersectionStatusChanged";
+      intersectionStatus: IntersectionStatus;
+    }
   | { _tag: "EditorTransactionApplied" }
   | { _tag: "StepsSent" }
   | {
@@ -242,6 +277,7 @@ export const update =
                     clientId: loadingEditorModel.clientId,
                     editor,
                     areStepsInFlight: false,
+                    optionIntersectionStatus: option.none,
                   },
                   cmd.none,
                 ]
@@ -271,19 +307,31 @@ export const update =
                 loadedModel,
                 pipe(
                   el,
-                  isBelowViewportOrAlmostEntirelyBeneathFooter,
-                  io.map((isBelowViewport_) =>
-                    match(isBelowViewport_)
-                      .with(false, () =>
+                  isAboveViewport,
+                  io.map((isAboveViewport_) =>
+                    match(isAboveViewport_)
+                      .with(true, () =>
                         window.scrollBy({ top: el.offsetHeight })
                       )
-                      .with(true, constVoid)
+                      .with(false, constVoid)
                       .exhaustive()
                   ),
                   cmdExtra.fromIOVoid,
                   cmdExtra.scheduleForNextAnimationFrame
                 ),
               ])
+              .with(
+                {
+                  _tag: "IntersectionStatusChanged",
+                  intersectionStatus: P.select(),
+                },
+                (intersectionStatus) => [
+                  Lens.fromProp<LoadedModel>()("optionIntersectionStatus").set(
+                    option.some(intersectionStatus)
+                  )(loadedModel),
+                  cmd.none,
+                ]
+              )
               .with({ _tag: "EditorTransactionApplied" }, () =>
                 match<boolean, [LoadedModel, Cmd<LoadedMsg>]>(
                   loadedModel.areStepsInFlight
@@ -418,14 +466,14 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
               ({
                 noteId: noteId_,
                 clientId,
-                creationTime,
+                creationTime: creationTime_,
                 initialProseMirrorDoc,
                 initialVersion,
               }): Parameters<typeof LoadingEditorOrLoaded>[0] => ({
                 dispatch: dispatch_,
                 currentTime,
                 noteId: noteId_,
-                creationTime,
+                creationTime: creationTime_,
                 initialProseMirrorDoc,
                 initialVersion,
                 clientId,
@@ -473,7 +521,7 @@ const LoadingEditorOrLoaded = ({
   dispatch: dispatch_,
   currentTime,
   noteId: noteId_,
-  creationTime,
+  creationTime: creationTime_,
   initialProseMirrorDoc,
   initialVersion,
   clientId,
@@ -492,6 +540,12 @@ const LoadingEditorOrLoaded = ({
         class: "px-8 pt-4 pb-12 focus:outline-none",
       },
       scrollMargin: {
+        top: 176,
+        bottom: 176,
+        left: 0,
+        right: 0,
+      },
+      scrollThreshold: {
         top: 176,
         bottom: 176,
         left: 0,
@@ -566,7 +620,7 @@ const LoadingEditorOrLoaded = ({
     <LoadedEditor
       dispatch={dispatch_}
       currentTime={currentTime}
-      creationTime={creationTime}
+      creationTime={creationTime_}
       editor={editor}
     />
   ) : (
@@ -577,7 +631,7 @@ const LoadingEditorOrLoaded = ({
 const LoadedEditor = ({
   dispatch: dispatch_,
   currentTime,
-  creationTime,
+  creationTime: creationTime_,
   editor,
 }: {
   dispatch: Dispatch<Msg>;
@@ -585,25 +639,83 @@ const LoadedEditor = ({
   creationTime: number;
   editor: ReactEditor;
 }) => {
-  const ref: React.Ref<HTMLDivElement> = React.useRef(null);
+  const componentDidMountRef = React.useRef<HTMLDivElement | null>(null);
 
   useStableLayoutEffect(
-    () => {
-      match(option.fromNullable(ref.current))
-        .with({ _tag: "Some", value: P.select() }, (value) =>
+    () =>
+      match(option.fromNullable(componentDidMountRef.current))
+        .with({ _tag: "Some", value: P.select() }, (value) => {
           dispatch_({
             _tag: "GotLoadedMsg",
             msg: { _tag: "ComponentDidMount", el: value },
-          })
-        )
+          });
+        })
         .with({ _tag: "None" }, constVoid)
-        .exhaustive();
-    },
+        .exhaustive(),
     [dispatch_],
     eq.tuple(dispatch.getEq<Msg>())
   );
 
-  const creationDateTime = DateTime.fromMillis(creationTime);
+  const { ref: inViewRef, entry } = useInView();
+
+  useStableEffect(
+    () => {
+      if (entry) {
+        dispatch_({
+          _tag: "GotLoadedMsg",
+          msg: {
+            _tag: "IntersectionStatusChanged",
+            intersectionStatus: entryToIntersectionStatus(entry),
+          },
+        });
+      }
+    },
+    [dispatch_, entry],
+    eq.tuple(dispatch.getEq<Msg>(), {
+      equals: (
+        entry1: IntersectionObserverEntry | undefined,
+        entry2: IntersectionObserverEntry | undefined
+      ) =>
+        match<
+          [
+            IntersectionObserverEntry | undefined,
+            IntersectionObserverEntry | undefined
+          ],
+          boolean
+        >([entry1, entry2])
+          .with([undefined, undefined], () => true)
+          .with(
+            [P.select("entry1_"), P.select("entry2_")],
+            ({ entry1_, entry2_ }) =>
+              !entry1_ || !entry2_
+                ? false
+                : entryToIntersectionStatus(entry1_) ===
+                  entryToIntersectionStatus(entry2_)
+          )
+          .exhaustive(),
+    })
+  );
+
+  React.useLayoutEffect(
+    () => () => {
+      const el = componentDidMountRef.current;
+
+      if (el) {
+        if (entry) {
+          match<IntersectionStatus, void>(entryToIntersectionStatus(entry))
+            .with("EntirelyAbove", () =>
+              window.scrollBy({ top: -el.offsetHeight })
+            )
+            .with("EntirelyBelow", () => constVoid)
+            .with("PartiallyOrEntirelyInView", constVoid)
+            .exhaustive();
+        }
+      }
+    },
+    [entry]
+  );
+
+  const creationDateTime = DateTime.fromMillis(creationTime_);
 
   const formattedCreationTime = match<Duration, string>(
     DateTime.fromMillis(currentTime).diff(creationDateTime)
@@ -628,7 +740,13 @@ const LoadedEditor = ({
     );
 
   return (
-    <div ref={ref} className="flex flex-col">
+    <div
+      ref={(node) => {
+        componentDidMountRef.current = node;
+        inViewRef(node);
+      }}
+      className="flex flex-col"
+    >
       <div className="flex justify-between sticky px-8 top-0 font-light text-stone-500 bg-white z-10 border-b border-stone-300">
         <span>{formattedCreationTime}</span>
       </div>
@@ -637,28 +755,28 @@ const LoadedEditor = ({
   );
 };
 
-const isBelowViewportOrAlmostEntirelyBeneathFooter: (
-  el: Element
-) => IO<boolean> = (el) => () => {
-  const isBelowViewport = (rect: DOMRect): boolean =>
-    rect.bottom > 0 &&
-    rect.top > (window.innerHeight || document.documentElement.clientHeight);
+const entryToIntersectionStatus = (
+  entry: IntersectionObserverEntry
+): IntersectionStatus =>
+  match<boolean, IntersectionStatus>(entry.isIntersecting)
+    .with(true, () => "PartiallyOrEntirelyInView")
+    .with(false, () =>
+      match<boolean, IntersectionStatus>(entry.boundingClientRect.top > 0)
+        .with(true, () => "EntirelyBelow")
+        .with(false, () => "EntirelyAbove")
+        .exhaustive()
+    )
+    .exhaustive();
 
-  // https://stackoverflow.com/a/40877241
-  // "almost entirely" here means that it is more than 2 pixels below the footer
-  const isAlmostEntirelyBeneathFooter = (rect: DOMRect): boolean =>
-    array.foldMap(boolean.MonoidAny)(
-      (elFromPoint: Element) =>
-        elFromPoint.id === htmlId.toString(htmlId.footer)
-    )(document.elementsFromPoint(rect.left, rect.top - 2));
-
-  return pipe(
-    el.getBoundingClientRect(),
-    function_
-      .getSemigroup(boolean.SemigroupAny)<DOMRect>()
-      .concat(isBelowViewport, isAlmostEntirelyBeneathFooter)
-  );
-};
+const isAboveViewport =
+  (el: Element): IO<boolean> =>
+  () =>
+    pipe(
+      el.getBoundingClientRect(),
+      (rect) =>
+        rect.bottom <=
+        (window.innerHeight || document.documentElement.clientHeight)
+    );
 
 // SUBSCRIPTIONS
 
