@@ -8,17 +8,7 @@ import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
 import type { Sub } from "elm-ts/lib/Sub";
-import {
-  array,
-  boolean,
-  eq,
-  function as function_,
-  io,
-  nonEmptyArray,
-  option,
-  readonlyArray,
-  tuple,
-} from "fp-ts";
+import { eq, io, nonEmptyArray, option, readonlyArray, tuple } from "fp-ts";
 import { constVoid, flow, identity, pipe } from "fp-ts/function";
 import type { IO } from "fp-ts/lib/IO";
 import type { NonEmptyArray } from "fp-ts/lib/NonEmptyArray";
@@ -43,7 +33,6 @@ import { useQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import * as dispatch from "~src/elm-ts/dispatch-extra";
-import * as htmlId from "~src/elm-ts/html-id";
 import * as logMessage from "~src/elm-ts/log-message";
 import { extensions } from "~src/tiptap-schema-extensions";
 import type { VersionedNote } from "~src/versioned-note";
