@@ -83,7 +83,10 @@ type LoadedModel = {
   optionIntersectionStatus: Option<IntersectionStatus>;
 };
 
-type IntersectionStatus = "InView" | "Above" | "Below";
+type IntersectionStatus =
+  | "PartiallyOrEntirelyInView"
+  | "EntirelyAbove"
+  | "EntirelyBelow";
 
 export const init = (noteId: Id<"notes">): [Model, Cmd<Msg>] => [
   {
@@ -136,10 +139,17 @@ export const isInView = (model: Model): Option<boolean> =>
       { _tag: "Loaded", optionIntersectionStatus: P.select() },
       option.map((intersectionStatus) =>
         match(intersectionStatus)
-          .with("InView", () => true)
+          .with("PartiallyOrEntirelyInView", () => true)
           .otherwise(() => false)
       )
     )
+    .exhaustive();
+
+export const isLoaded = (model: Model): boolean =>
+  match(model)
+    .with({ _tag: "LoadingNoteAndClientId" }, () => false)
+    .with({ _tag: "LoadingEditor" }, () => false)
+    .with({ _tag: "Loaded" }, () => true)
     .exhaustive();
 
 // UPDATE
@@ -163,7 +173,6 @@ type LoadingEditorMsg = {
 
 type LoadedMsg =
   | { _tag: "ComponentDidMount"; el: HTMLDivElement }
-  | { _tag: "ComponentWillUnmount"; el: HTMLDivElement }
   | {
       _tag: "IntersectionStatusChanged";
       intersectionStatus: IntersectionStatus;
@@ -310,12 +319,10 @@ export const update =
                 pipe(
                   el,
                   isAboveViewport,
-                  io.map((isInViewport_) =>
-                    match(isInViewport_)
-                      .with(
-                        true,
-                        // TODO?
-                        () => window.scrollBy({ top: el.offsetHeight })
+                  io.map((isAboveViewport_) =>
+                    match(isAboveViewport_)
+                      .with(true, () =>
+                        window.scrollBy({ top: el.offsetHeight })
                       )
                       .with(false, constVoid)
                       .exhaustive()
@@ -323,46 +330,6 @@ export const update =
                   cmdExtra.fromIOVoid,
                   cmdExtra.scheduleForNextAnimationFrame
                 ),
-              ])
-              .with({ _tag: "ComponentWillUnmount", el: P.select() }, (el) => [
-                loadedModel,
-                match(loadedModel.optionIntersectionStatus)
-                  .with({ _tag: "None" }, () => cmd.none)
-                  .with(
-                    { _tag: "Some", value: P.select() },
-                    (intersectionStatus) =>
-                      match(intersectionStatus)
-                        .with("InView", () => cmd.none)
-                        .with("Above", () => cmd.none)
-                        .with("Below", () => cmd.none)
-                        .exhaustive()
-                  )
-                  .exhaustive(),
-                // TODO
-                // pipe(
-                //   el,
-                //   function_
-                //     .getSemigroup(
-                //       io.getSemigroup(boolean.SemigroupAny)
-                //     )<Element>()
-                //     .concat(isAboveViewport, isInViewport),
-                //   io.map((isAboveViewport_) =>
-                //     match(isAboveViewport_)
-                //       .with(
-                //         true,
-                //         // TODO?
-                //         () => {
-                //           console.log("scrolled");
-                //           console.log("offset", el.offsetHeight);
-                //           window.scrollBy({ top: -el.offsetHeight });
-                //         }
-                //       )
-                //       .with(false, constVoid)
-                //       .exhaustive()
-                //   ),
-                //   cmdExtra.fromIOVoid,
-                //   cmdExtra.scheduleForNextAnimationFrame
-                // ),
               ])
               .with(
                 {
@@ -742,89 +709,21 @@ const LoadedEditor = ({
 
   React.useLayoutEffect(
     () => () => {
-      console.log("component will unmount");
       const el = componentDidMountRef.current;
 
       if (el) {
         if (entry) {
-          console.log("el.offsetHeight", el.offsetHeight);
           match<IntersectionStatus, void>(entryToIntersectionStatus(entry))
-            .with("Above", () => window.scrollBy({ top: -el.offsetHeight }))
-            // .with("Below", () => window.scrollBy({ top: el.offsetHeight }))
-            .with("Below", () => constVoid)
-            .with("InView", constVoid)
+            .with("EntirelyAbove", () =>
+              window.scrollBy({ top: -el.offsetHeight })
+            )
+            .with("EntirelyBelow", () => constVoid)
+            .with("PartiallyOrEntirelyInView", constVoid)
             .exhaustive();
         }
-
-        // dispatch_({
-        //   _tag: "GotLoadedMsg",
-        //   msg: {
-        //     _tag: "ComponentWillUnmount",
-        //     el,
-        //   },
-        // });
       }
-
-      // if (el) {
-      //   pipe(
-      //     el,
-      //     // function_
-      //     //   .getSemigroup(io.getSemigroup(boolean.SemigroupAny))<Element>()
-      //     //   .concat(isAboveViewport, isInViewport),
-      //     isAboveViewport,
-      //     io.chain((isAboveViewport_) =>
-      //       match(isAboveViewport_)
-      //         .with(
-      //           true,
-      //           // TODO?
-      //           () => () => {
-      //             console.log("scrolled");
-      //             console.log("offset", el.offsetHeight);
-      //             window.scrollBy({ top: -el.offsetHeight });
-      //           }
-      //         )
-      //         .with(false, () => isInOrBelowViewport)
-      //         .exhaustive()
-      //     )
-      //   )()
-      // }
-      // match(option.fromNullable(componentDidMountRef.current))
-      //   .with({ _tag: "Some", value: P.select() }, (el) =>
-      //     pipe(
-      //       el,
-      //       // function_
-      //       //   .getSemigroup(io.getSemigroup(boolean.SemigroupAny))<Element>()
-      //       //   .concat(isAboveViewport, isInViewport),
-      //       isAboveViewport,
-      //       io.map((isAboveViewport_) =>
-      //         match(isAboveViewport_)
-      //           .with(
-      //             true,
-      //             // TODO?
-      //             () => {
-      //               console.log("scrolled");
-      //               console.log("offset", el.offsetHeight);
-      //               window.scrollBy({ top: -el.offsetHeight });
-      //             }
-      //           )
-      //           .with(false, constVoid)
-      //           .exhaustive()
-      //       )
-      //     )()
-      //   )
-      //   .with({ _tag: "None" }, constVoid)
-      //   .exhaustive();
     },
     [entry]
-    // [dispatch_, componentDidMountRef],
-    // eq.tuple(dispatch.getEq<Msg>(), {
-    //   equals: (
-    //     mutRef1: React.MutableRefObject<HTMLDivElement | null>,
-    //     mutRef2: React.MutableRefObject<HTMLDivElement | null>
-    //   ) =>
-    //     (mutRef1.current === null && mutRef2.current === null) ||
-    //     (mutRef1.current !== null && mutRef2.current !== null),
-    // })
   );
 
   const creationDateTime = DateTime.fromMillis(creationTime_);
@@ -871,51 +770,14 @@ const entryToIntersectionStatus = (
   entry: IntersectionObserverEntry
 ): IntersectionStatus =>
   match<boolean, IntersectionStatus>(entry.isIntersecting)
-    .with(true, () => "InView")
+    .with(true, () => "PartiallyOrEntirelyInView")
     .with(false, () =>
       match<boolean, IntersectionStatus>(entry.boundingClientRect.top > 0)
-        .with(true, () => "Below")
-        .with(false, () => "Above")
+        .with(true, () => "EntirelyBelow")
+        .with(false, () => "EntirelyAbove")
         .exhaustive()
     )
     .exhaustive();
-
-const isBelowViewportOrAlmostEntirelyBeneathFooter: (
-  el: Element
-) => IO<boolean> = (el) => () => {
-  const isBelowViewport = (rect: DOMRect): boolean =>
-    rect.bottom > 0 &&
-    rect.top > (window.innerHeight || document.documentElement.clientHeight);
-
-  // https://stackoverflow.com/a/40877241
-  // "almost entirely" here means that it is more than 2 pixels below the footer
-  const isAlmostEntirelyBeneathFooter = (rect: DOMRect): boolean =>
-    array.foldMap(boolean.MonoidAny)(
-      (elFromPoint: Element) =>
-        elFromPoint.id === htmlId.toString(htmlId.footer)
-    )(document.elementsFromPoint(rect.left, rect.top - 2));
-
-  return pipe(
-    el.getBoundingClientRect(),
-    function_
-      .getSemigroup(boolean.SemigroupAny)<DOMRect>()
-      .concat(isBelowViewport, isAlmostEntirelyBeneathFooter)
-  );
-};
-
-const isInViewport =
-  (el: Element): IO<boolean> =>
-  () =>
-    pipe(
-      el.getBoundingClientRect(),
-      (rect) =>
-        rect.top >= 0 &&
-        rect.left >= 0 &&
-        rect.bottom <=
-          (window.innerHeight || document.documentElement.clientHeight) &&
-        rect.right <=
-          (window.innerWidth || document.documentElement.clientWidth)
-    );
 
 const isAboveViewport =
   (el: Element): IO<boolean> =>
@@ -924,16 +786,6 @@ const isAboveViewport =
       el.getBoundingClientRect(),
       (rect) =>
         rect.bottom <=
-        (window.innerHeight || document.documentElement.clientHeight)
-    );
-
-const isBelowViewport =
-  (el: Element): IO<boolean> =>
-  () =>
-    pipe(
-      el.getBoundingClientRect(),
-      (rect) =>
-        rect.top >=
         (window.innerHeight || document.documentElement.clientHeight)
     );
 

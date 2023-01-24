@@ -49,9 +49,9 @@ type LoadingNotesModel = { _tag: "LoadingNotes" };
 type LoadedNotesModel = {
   _tag: "LoadedNotes";
   noteModels: note.Model[];
-  hasInitialLoadOccurred: boolean;
   isNoteBeingCreated: boolean;
   optionDatePaginationCursors: Option<DatePaginationCursors>;
+  haveAllNotesLoaded: boolean;
 };
 
 export const init: Model = {
@@ -118,9 +118,9 @@ export const update =
                 (noteModels): LoadedNotesModel => ({
                   _tag: "LoadedNotes",
                   noteModels,
-                  hasInitialLoadOccurred: false,
                   isNoteBeingCreated: false,
                   optionDatePaginationCursors: option.none,
+                  haveAllNotesLoaded: false,
                 })
               )
             )
@@ -223,8 +223,6 @@ export const update =
                             LoadedNotesModel,
                             Cmd<Msg>
                           ]) =>
-                            // TODO: Note that this could also be handled by exposing a function from the `notes` module which expects a boolean value and returns a `Msg` for this module's update function to run when the `isInView` value changes. What are the tradeoffs? Which is better?
-                            // Check whether `isInView` value changed
                             match<boolean, [LoadedNotesModel, Cmd<Msg>]>(
                               option
                                 .getEq(boolean.Eq)
@@ -233,16 +231,11 @@ export const update =
                                   note.isInView(noteModel_)
                                 )
                             )
-                              // If it didn't, don't do anything
                               .with(true, () => [loadedNotesModel_, cmd_])
-                              // If it did, update
                               .with(false, () => {
-                                // TODO: Maybe expose a function from the `note` module to explicitly check this
                                 const areAllNotesLoaded = pipe(
                                   loadedNotesModel_.noteModels,
-                                  array.every(
-                                    flow(note.isInView, option.isSome)
-                                  )
+                                  array.every(note.isLoaded)
                                 );
 
                                 const getDatePaginationCursors = (
@@ -251,7 +244,6 @@ export const update =
                                   pipe(
                                     noteModels_,
                                     array.filterMap((noteModel__) =>
-                                      // TODO: Clean this up
                                       match(note.isInView(noteModel__))
                                         .with(
                                           { _tag: "Some", value: true },
@@ -292,10 +284,22 @@ export const update =
                                               option.some(datePaginationCursors)
                                             ),
                                             Lens.fromProp<LoadedNotesModel>()(
-                                              "hasInitialLoadOccurred"
+                                              "haveAllNotesLoaded"
                                             ).set(true)
                                           ),
-                                          cmd.none,
+                                          match(
+                                            loadedNotesModel_.haveAllNotesLoaded
+                                          )
+                                            .with(true, () => cmd.none)
+                                            .with(false, () =>
+                                              cmdExtra.fromIOVoid(() =>
+                                                window.scrollTo(
+                                                  0,
+                                                  document.body.scrollHeight
+                                                )
+                                              )
+                                            )
+                                            .exhaustive(),
                                         ]
                                       )
                                     )
@@ -323,31 +327,6 @@ export const update =
             logMessage.error("Failed to match model with msg", { model, msg })
           ),
         ])
-      // ([model_, cmd_]) =>
-      //   match<Model, [Model, Cmd<Msg>]>(model_)
-      //     .with({ _tag: "LoadingNotes" }, () => [model_, cmd_])
-      //     .with(P.select({ _tag: "LoadedNotes" }), (loadedNotesModel) => {
-      //       const wereAllNotesLoaded = pipe(
-      //         loadedNotesModel.noteModels,
-      //         array.every(flow(note.isInView, option.isSome))
-      //       );
-      //
-      //       const maybeScrollCmd = match(
-      //         !wereAllNotesLoaded && !loadedNotesModel.hasInitialLoadOccurred
-      //       )
-      //         .with(false, () => cmd.none)
-      //         .with(true, () =>
-      //           cmdExtra.scheduleForNextAnimationFrame(
-      //             cmdExtra.fromIOVoid(() => {
-      //               window.scrollTo(0, document.body.scrollHeight);
-      //             })
-      //           )
-      //         )
-      //         .exhaustive();
-      //
-      //       return [model_, maybeScrollCmd];
-      //     })
-      //     .exhaustive()
     );
 
 const reconcileNotes = (
