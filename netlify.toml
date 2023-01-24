@@ -1,6 +1,6 @@
 [build]
   publish = "dist/"
-  command = "npx convex deploy && npx parcel build src/elm-ts/index.html"
+  command = "npx convex deploy && npx parcel build --no-source-maps src/elm-ts/index.html"
 [functions]
   directory = "src/netlify/"
 [dev]
