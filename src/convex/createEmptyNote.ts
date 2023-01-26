@@ -1,7 +1,7 @@
 import { EditorState } from "prosemirror-state";
 
-import { schema } from "../tiptap-schema-extensions";
-import { mutation } from "./_generated/server";
+import { mutation } from "~src/convex/_generated/server";
+import { schema } from "~src/tiptap-schema-extensions";
 
 export default mutation(async ({ db, auth }): Promise<void> => {
   const userIdentity = await auth.getUserIdentity();

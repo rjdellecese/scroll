@@ -14,6 +14,7 @@ module.exports = {
     "fp-ts",
     "simple-import-sort",
     "no-type-assertion",
+    "no-relative-import-paths",
     "unicorn",
     "react",
   ],
@@ -29,6 +30,10 @@ module.exports = {
       { argsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" },
     ],
     "no-type-assertion/no-type-assertion": "warn",
+    "no-relative-import-paths/no-relative-import-paths": [
+      "warn",
+      { rootDir: "src", prefix: "~src" },
+    ],
     "no-unused-vars": "off",
     "no-redeclare": "off", // `fp-ts` relies on redeclarations for its implementation of higher-kinded types
     "no-shadow": "error",

@@ -1,7 +1,7 @@
-import type { VersionedNote } from "../versioned-note";
-import type { Id } from "./_generated/dataModel";
-import { query } from "./_generated/server";
-import getNoteVersion from "./getNoteVersion";
+import type { Id } from "~src/convex/_generated/dataModel";
+import { query } from "~src/convex/_generated/server";
+import getNoteVersion from "~src/convex/getNoteVersion";
+import type { VersionedNote } from "~src/versioned-note";
 
 export default query(
   async ({ db, auth }, noteId: Id<"notes">): Promise<VersionedNote> => {

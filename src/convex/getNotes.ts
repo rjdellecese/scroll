@@ -1,6 +1,6 @@
-import type { DatePaginationCursors } from "../date-pagination-cursors";
-import type { Id } from "./_generated/dataModel";
-import { query } from "./_generated/server";
+import type { Id } from "~src/convex/_generated/dataModel";
+import { query } from "~src/convex/_generated/server";
+import type { DatePaginationCursors } from "~src/date-pagination-cursors";
 
 export default query(
   async (

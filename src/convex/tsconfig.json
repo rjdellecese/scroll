@@ -8,6 +8,10 @@
     "allowJs": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "baseUrl": "../..",
+    "paths": {
+      "~src/*": ["src/*"]
+    },
 
     /* These compiler options are required by Convex */
     "target": "ESNext",

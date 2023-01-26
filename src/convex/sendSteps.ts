@@ -1,10 +1,10 @@
 import { Node } from "prosemirror-model";
 import { Step } from "prosemirror-transform";
 
-import { schema } from "../tiptap-schema-extensions";
-import type { Id } from "./_generated/dataModel";
-import { mutation } from "./_generated/server";
-import getNoteVersion from "./getNoteVersion";
+import type { Id } from "~src/convex/_generated/dataModel";
+import { mutation } from "~src/convex/_generated/server";
+import getNoteVersion from "~src/convex/getNoteVersion";
+import { schema } from "~src/tiptap-schema-extensions";
 
 export default mutation(
   async (

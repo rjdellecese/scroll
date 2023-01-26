@@ -1,5 +1,5 @@
-import type { Id } from "./_generated/dataModel";
-import type { DatabaseReader } from "./_generated/server";
+import type { Id } from "~src/convex/_generated/dataModel";
+import type { DatabaseReader } from "~src/convex/_generated/server";
 
 export default async (
   db: DatabaseReader,

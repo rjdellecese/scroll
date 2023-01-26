@@ -1,5 +1,5 @@
-import type { Document, Id } from "./_generated/dataModel";
-import { query } from "./_generated/server";
+import type { Document, Id } from "~src/convex/_generated/dataModel";
+import { query } from "~src/convex/_generated/server";
 
 export default query(
   async (
