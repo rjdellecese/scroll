@@ -17,7 +17,7 @@ import type { Response as FetchResponse } from "node-fetch";
 import fetch from "node-fetch";
 import { match, P } from "ts-pattern";
 
-import * as sentryConfig from "../sentry-config";
+import * as sentryConfig from "~src/sentry-config";
 
 // I used the Ruby code from https://docs.sentry.io/platforms/javascript/troubleshooting/#using-the-tunnel-option as a reference for the below.
 const handler: Handler = async (event) =>

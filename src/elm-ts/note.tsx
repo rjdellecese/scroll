@@ -34,11 +34,10 @@ import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import * as dispatch from "~src/elm-ts/dispatch-extra";
 import * as logMessage from "~src/elm-ts/log-message";
+import type { Stage } from "~src/elm-ts/stage";
 import { extensions } from "~src/tiptap-schema-extensions";
 import type { VersionedNote } from "~src/versioned-note";
 import * as versionedNote from "~src/versioned-note";
-
-import type { Stage } from "./stage";
 
 // MODEL
 

@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "esModuleInterop": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "baseUrl": "../..",
+    "paths": {
+      "~src/*": ["src/*"]
+    }
   },
   "include": ["./**/*"],
   "extends": "@tsconfig/node16-strictest/tsconfig.json"

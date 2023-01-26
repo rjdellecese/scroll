@@ -3,7 +3,7 @@ import type { Config } from "tailwindcss/types/config";
 import type { DefaultColors } from "tailwindcss/types/generated/colors";
 
 // @ts-ignore
-import tailwindConfig from "~tailwind.config.js";
+import tailwindConfig from "~/tailwind.config.js";
 
 // eslint-disable-next-line no-type-assertion/no-type-assertion
 const resolvedTailwindConfig = resolveConfig(tailwindConfig) as Config & {

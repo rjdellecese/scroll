@@ -16,7 +16,7 @@ import type { Option } from "fp-ts/lib/Option";
 import { createRoot } from "react-dom/client";
 import { match, P } from "ts-pattern";
 
-import * as app from "~/src/elm-ts/app";
+import * as app from "~src/elm-ts/app";
 import type { Stage } from "~src/elm-ts/stage";
 import * as stage from "~src/elm-ts/stage";
 import * as sentryConfig from "~src/sentry-config";
