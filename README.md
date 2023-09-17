@@ -4,7 +4,7 @@
 
 Scroll is a prototype of an infinite-scrolling note-taking app, built on [Convex](https://www.convex.dev/) with ProseMirror. Collaborative editing is supported via [ProseMirror's collab module](https://prosemirror.net/docs/ref/#collab) (which employs Operational Transformation, or OT), and its implementation is based on [this example implementation in the ProseMirror guide](https://prosemirror.net/docs/guide/#collab).
 
-If you want to see the collaborative editing feature in action, open two tabs side-by-side (or one on another device) and go ham.
+If you want to see the collaborative editing feature in action, open two tabs side-by-side (or one on another device) and start editing a note in one of them.
 
 ## Collaborative Editing with Convex
 
@@ -25,6 +25,6 @@ This implementation should work beautifully at a relatively small scale (a few u
 
 Note also that in this implementation, no [steps](https://prosemirror.net/docs/ref/#transform.Steps) are ever thrown away, so the number of steps in a single document will grow indefinitely. The benefit of this is that any client that has ever connected to the ProseMirror document in question can always have their changes reconciled with the latest ones. However, if the number of steps ever grows too large (for most use cases this will never occur), you could come up with heuristics for determining when it is safe to throw some steps away. For example, you could track each client that connects to each ProseMirror document, and assume that clients that have not been active in the last two weeks are no longer live that we therefore don't need to keep around each step between the state of the document when they were last active and the state that it is in now (so that they might be able to reconcile any of their local changes with remote ones).
 
-## Further Discussion
+## Questions?
 
 If you have questions about this project feel free to reach out to me directly. If you have any questions about this project's implementation of collaborative editing with Convex, consider asking them on the [Convex Discord](https://www.convex.dev/community)!
