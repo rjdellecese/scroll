@@ -1,5 +1,4 @@
-import type { Handler } from "@netlify/functions";
-import type { Response } from "@netlify/functions/dist/function/response";
+import type { Handler, HandlerResponse } from "@netlify/functions";
 import {
   either,
   json,
@@ -12,7 +11,7 @@ import type { Either } from "fp-ts/lib/Either";
 import { constVoid, flow, pipe } from "fp-ts/lib/function";
 import type { Json } from "fp-ts/lib/Json";
 import type { TaskEither } from "fp-ts/lib/TaskEither";
-import { url } from "fp-ts-std";
+import * as url from "fp-ts-std/URL";
 import type { Response as FetchResponse } from "node-fetch";
 import fetch from "node-fetch";
 import { match, P } from "ts-pattern";
@@ -44,9 +43,12 @@ const handler: Handler = async (event) =>
           ),
         ),
         either.chain((headers) =>
+          // @ts-expect-error
           match<Json, Either<string, URL>>(headers)
-            .with({ dsn: P.select("dsn", P.string) }, ({ dsn }) =>
-              url.parse((error) => `${error}`)(dsn),
+            .with(
+              { dsn: P.select("dsn", P.string) },
+              ({ dsn }): Either<string, URL> =>
+                url.parse((error) => `${error}`)(dsn),
             )
             .otherwise(() => either.left("Couldn't find dsn header")),
         ),
@@ -106,12 +108,12 @@ const handler: Handler = async (event) =>
       ),
     ),
     taskEither.match(
-      (error): Response => {
+      (error): HandlerResponse => {
         const errorMessage = "Failed to send to Sentry";
         console.error(errorMessage, error);
         return { statusCode: 400, body: errorMessage };
       },
-      (): Response => ({ statusCode: 200 }),
+      (): HandlerResponse => ({ statusCode: 200 }),
     ),
   )();
 
