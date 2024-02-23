@@ -1,8 +1,8 @@
 import type { eq } from "fp-ts";
 
-import type { Document } from "~src/convex/_generated/dataModel";
+import type { Doc } from "~src/convex/_generated/dataModel";
 
-export type VersionedNote = Omit<Document<"notes">, "proseMirrorDoc"> & {
+export type VersionedNote = Omit<Doc<"notes">, "proseMirrorDoc"> & {
   proseMirrorDoc: string;
   version: number;
 };

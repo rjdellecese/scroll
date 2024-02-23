@@ -14,9 +14,7 @@ import type { Dispatch, ReactNode } from "react";
 import React, { useEffect, useState } from "react";
 import { match, P } from "ts-pattern";
 
-import * as clerkFrontendApiKey from "~src/clerk-frontend-api-key";
-import type { API } from "~src/convex/_generated/api";
-import clientConfig from "~src/convex/_generated/clientConfig";
+import * as clerkPublishableKey from "~src/clerk-publishable-key";
 import * as page from "~src/elm-ts/app/page";
 import { appearance } from "~src/elm-ts/clerk-appearance";
 import { ClerkLayout } from "~src/elm-ts/clerk-layout";
@@ -30,29 +28,29 @@ import type { Stage } from "~src/elm-ts/stage";
 type Model = {
   stage: Stage;
   currentTime: number;
-  convex: ConvexReactClient<API>;
+  convex: ConvexReactClient;
   page: page.Model;
   areFontsLoaded: boolean;
 };
 
 export const init: (
-  flags: Flags
+  flags: Flags,
 ) => (location: Location) => [Model, Cmd<Msg>] = (flags) => (location) =>
   pipe(
     page.init(location),
     tuple.bimap(
       flow(
         cmd.map((pageMsg): Msg => ({ _tag: "GotPageMsg", msg: pageMsg })),
-        (cmd_: Cmd<Msg>) => cmd.batch([cmd_, loadFontsAndNotifyWhenLoaded])
+        (cmd_: Cmd<Msg>) => cmd.batch([cmd_, loadFontsAndNotifyWhenLoaded]),
       ),
       (pageModel) => ({
         stage: flags.stage,
         currentTime: flags.time,
-        convex: new ConvexReactClient(clientConfig),
+        convex: new ConvexReactClient(flags.convexUrl),
         page: pageModel,
         areFontsLoaded: false,
-      })
-    )
+      }),
+    ),
   );
 
 // Prevent Flash Of Unstyled Text (FOUT), which can cause a layout shift.
@@ -62,7 +60,7 @@ const loadFontsAndNotifyWhenLoaded: Cmd<Msg> = cmdExtra.fromTask(() =>
     document.fonts.load("16px MulishVariable"),
     document.fonts.load("16px LoraVariable"),
     document.fonts.load("16px JetBrains MonoVariable"),
-  ]).then((): Msg => ({ _tag: "FontsLoaded" }))
+  ]).then((): Msg => ({ _tag: "FontsLoaded" })),
 );
 
 export const locationToMsg = (location: Location): Msg => ({
@@ -90,9 +88,9 @@ export const update = (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
           page.update(model.stage, model.convex)(pageMsg, pageModel),
           tuple.bimap(
             cmd.map((pageMsg_) => ({ _tag: "GotPageMsg", msg: pageMsg_ })),
-            (pageModel_) => ({ ...model, page: pageModel_ })
-          )
-        )
+            (pageModel_) => ({ ...model, page: pageModel_ }),
+          ),
+        ),
     )
     .with([{ _tag: "FontsLoaded" }, P.any], () => [
       Lens.fromProp<Model>()("areFontsLoaded").set(true)(model),
@@ -116,7 +114,7 @@ const ConvexProviderWithClerk = ({
 }: {
   children?: ReactNode;
   dispatch: Dispatch<Msg>;
-  convexClient: ConvexReactClient<API>;
+  convexClient: ConvexReactClient;
   isAuthPage: boolean;
   areFontsLoaded: boolean;
 }) => {
@@ -125,11 +123,12 @@ const ConvexProviderWithClerk = ({
 
   useEffect(() => {
     async function setAuth() {
-      const token = await getToken({ template: "convex", skipCache: true });
-      if (token) {
-        convexClient.setAuth(token);
+      const fetchToken = async () => {
+        const token = await getToken({ template: "convex", skipCache: true });
         setClientAuthed(true);
-      }
+        return token;
+      };
+      convexClient.setAuth(fetchToken);
     }
 
     match(isSignedIn)
@@ -145,7 +144,7 @@ const ConvexProviderWithClerk = ({
         match(isAuthPage)
           .with(true, constVoid)
           .with(false, () => dispatch({ _tag: "NotSignedIn" }))
-          .exhaustive()
+          .exhaustive(),
       )
       .exhaustive();
   }, [convexClient, isSignedIn, isAuthPage, dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -161,27 +160,26 @@ const ConvexProviderWithClerk = ({
   return <ConvexProvider client={convexClient}>{children}</ConvexProvider>;
 };
 
-export const view: (model: Model) => Html<Msg> = (model) => (dispatch) =>
-  (
-    <ClerkProvider
-      frontendApi={clerkFrontendApiKey.fromStage(model.stage)}
-      appearance={appearance}
+export const view: (model: Model) => Html<Msg> = (model) => (dispatch) => (
+  <ClerkProvider
+    publishableKey={clerkPublishableKey.fromStage(model.stage)}
+    appearance={appearance}
+  >
+    <ConvexProviderWithClerk
+      dispatch={dispatch}
+      convexClient={model.convex}
+      isAuthPage={page.isAuthPage(model.page)}
+      areFontsLoaded={model.areFontsLoaded}
     >
-      <ConvexProviderWithClerk
-        dispatch={dispatch}
-        convexClient={model.convex}
-        isAuthPage={page.isAuthPage(model.page)}
-        areFontsLoaded={model.areFontsLoaded}
-      >
-        {pipe(
-          model.page,
-          page.view(model.currentTime),
-          html.map((pageMsg): Msg => ({ _tag: "GotPageMsg", msg: pageMsg })),
-          apply(dispatch)
-        )}
-      </ConvexProviderWithClerk>
-    </ClerkProvider>
-  );
+      {pipe(
+        model.page,
+        page.view(model.currentTime),
+        html.map((pageMsg): Msg => ({ _tag: "GotPageMsg", msg: pageMsg })),
+        apply(dispatch),
+      )}
+    </ConvexProviderWithClerk>
+  </ClerkProvider>
+);
 
 // SUBSCRIPTIONS
 
@@ -189,6 +187,6 @@ export const subscriptions = (model: Model): Sub<Msg> =>
   sub.batch([
     time.every(1000, (newTime) => ({ _tag: "Tick", newTime })),
     sub.map((pageMsg: page.Msg): Msg => ({ _tag: "GotPageMsg", msg: pageMsg }))(
-      page.subscriptions(model.page)
+      page.subscriptions(model.page),
     ),
   ]);

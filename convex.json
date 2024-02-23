@@ -1,16 +1,3 @@
 {
-  "project": "scroll",
-  "team": "rjdellecese",
-  "prodUrl": "https://fleet-capybara-2.convex.cloud",
-  "functions": "src/convex/",
-  "authInfo": [
-    {
-      "domain": "https://clerk.concise.escargot-18.lcl.dev/",
-      "applicationID": "convex"
-    },
-    {
-      "domain": "https://clerk.scroll.ink/",
-      "applicationID": "convex"
-    }
-  ]
+  "functions": "src/convex/"
 }

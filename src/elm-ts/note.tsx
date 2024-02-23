@@ -3,7 +3,7 @@ import { Extension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import type { Editor as ReactEditor } from "@tiptap/react";
 import { EditorContent, useEditor } from "@tiptap/react";
-import type { ConvexReactClient } from "convex/react";
+import { type ConvexReactClient, useQuery } from "convex/react";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import { cmd, sub } from "elm-ts/lib/index";
 import type { Html } from "elm-ts/lib/React";
@@ -22,14 +22,18 @@ import { DateTime } from "luxon";
 import { Lens } from "monocle-ts";
 import * as collab from "prosemirror-collab";
 import { Step } from "prosemirror-transform";
-import type { Dispatch, ReactElement } from "react";
-import React from "react";
+import {
+  type Dispatch,
+  type ReactElement,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { useInView } from "react-intersection-observer";
 import { match, P } from "ts-pattern";
 
-import type { API } from "~src/convex/_generated/api";
+import { api } from "~src/convex/_generated/api";
 import type { Id } from "~src/convex/_generated/dataModel";
-import { useQuery } from "~src/convex/_generated/react";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
 import * as dispatch from "~src/elm-ts/dispatch-extra";
@@ -89,9 +93,9 @@ export const init = (noteId: Id<"notes">): [Model, Cmd<Msg>] => [
       (clientId): Msg => ({
         _tag: "GotLoadingNoteAndClientIdMsg",
         msg: { _tag: "ClientIdGenerated", clientId },
-      })
+      }),
     ),
-    cmdExtra.fromIO
+    cmdExtra.fromIO,
   ),
 ];
 
@@ -100,7 +104,7 @@ export const noteId = (model: Model): Id<"notes"> =>
     .with({ _tag: "LoadingNoteAndClientId", noteId: P.select() }, identity)
     .with(
       { _tag: "LoadingEditor", versionedNote: { _id: P.select() } },
-      identity
+      identity,
     )
     .with({ _tag: "Loaded", noteId: P.select() }, identity)
     .exhaustive();
@@ -109,11 +113,11 @@ export const creationTime = (model: Model): Option<number> =>
   match(model)
     .with(
       { _tag: "LoadingNoteAndClientId", optionVersionedNote: P.select() },
-      option.map(({ _creationTime }: VersionedNote) => _creationTime)
+      option.map(({ _creationTime }: VersionedNote) => _creationTime),
     )
     .with(
       { _tag: "LoadingEditor", versionedNote: { _creationTime: P.select() } },
-      option.some
+      option.some,
     )
     .with({ _tag: "Loaded", creationTime: P.select() }, option.some)
     .exhaustive();
@@ -128,8 +132,8 @@ export const isInView = (model: Model): Option<boolean> =>
       option.map((intersectionStatus) =>
         match(intersectionStatus)
           .with("PartiallyOrEntirelyInView", () => true)
-          .otherwise(() => false)
-      )
+          .otherwise(() => false),
+      ),
     )
     .exhaustive();
 
@@ -173,7 +177,7 @@ type LoadedMsg =
     };
 
 export const update =
-  (stage: Stage, convex: ConvexReactClient<API>) =>
+  (stage: Stage, convex: ConvexReactClient) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with(
@@ -196,21 +200,21 @@ export const update =
                 { _tag: "ClientIdGenerated", clientId: P.select() },
                 (clientId) => [
                   Lens.fromProp<LoadingNoteAndClientIdModel>()(
-                    "optionClientId"
+                    "optionClientId",
                   ).set(option.some(clientId))(loadingNoteAndClientIdModel),
                   cmd.none,
-                ]
+                ],
               )
               .with(
                 { _tag: "VersionedNoteReceived", versionedNote: P.select() },
                 (versionedNote_) => [
                   Lens.fromProp<LoadingNoteAndClientIdModel>()(
-                    "optionVersionedNote"
+                    "optionVersionedNote",
                   ).set(option.some(versionedNote_))(
-                    loadingNoteAndClientIdModel
+                    loadingNoteAndClientIdModel,
                   ),
                   cmd.none,
-                ]
+                ],
               )
               .exhaustive(),
             tuple.mapFst((loadingNoteandClientIdModel_) =>
@@ -233,11 +237,11 @@ export const update =
                     _tag: "LoadingEditor",
                     clientId,
                     versionedNote: versionedNote_,
-                  })
+                  }),
                 )
-                .otherwise(() => loadingNoteandClientIdModel_)
-            )
-          )
+                .otherwise(() => loadingNoteandClientIdModel_),
+            ),
+          ),
       )
       .with(
         [
@@ -253,11 +257,11 @@ export const update =
               (loadingEditorMsg_): Msg => ({
                 _tag: "GotLoadingEditorMsg",
                 msg: loadingEditorMsg_,
-              })
-            )
+              }),
+            ),
           )(
             match<LoadingEditorMsg, [LoadedModel, Cmd<LoadingEditorMsg>]>(
-              loadingEditorMsg
+              loadingEditorMsg,
             )
               .with(
                 {
@@ -279,10 +283,10 @@ export const update =
                     optionIntersectionStatus: option.none,
                   },
                   cmd.none,
-                ]
+                ],
               )
-              .exhaustive()
-          )
+              .exhaustive(),
+          ),
       )
       .with(
         [
@@ -298,8 +302,8 @@ export const update =
               (loadedMsg_): Msg => ({
                 _tag: "GotLoadedMsg",
                 msg: loadedMsg_,
-              })
-            )
+              }),
+            ),
           )(
             match<LoadedMsg, [LoadedModel, Cmd<LoadedMsg>]>(loadedMsg)
               .with({ _tag: "ComponentDidMount", el: P.select() }, (el) => [
@@ -310,13 +314,13 @@ export const update =
                   io.map((isAboveViewport_) =>
                     match(isAboveViewport_)
                       .with(true, () =>
-                        window.scrollBy({ top: el.offsetHeight })
+                        window.scrollBy({ top: el.offsetHeight }),
                       )
                       .with(false, constVoid)
-                      .exhaustive()
+                      .exhaustive(),
                   ),
                   cmdExtra.fromIOVoid,
-                  cmdExtra.scheduleForNextAnimationFrame
+                  cmdExtra.scheduleForNextAnimationFrame,
                 ),
               ])
               .with(
@@ -326,14 +330,14 @@ export const update =
                 },
                 (intersectionStatus) => [
                   Lens.fromProp<LoadedModel>()("optionIntersectionStatus").set(
-                    option.some(intersectionStatus)
+                    option.some(intersectionStatus),
                   )(loadedModel),
                   cmd.none,
-                ]
+                ],
               )
               .with({ _tag: "EditorTransactionApplied" }, () =>
                 match<boolean, [LoadedModel, Cmd<LoadedMsg>]>(
-                  loadedModel.areStepsInFlight
+                  loadedModel.areStepsInFlight,
                 )
                   .with(true, () => [loadedModel, cmd.none])
                   .with(false, () =>
@@ -344,13 +348,13 @@ export const update =
                       .with(null, () => [loadedModel, cmd.none])
                       .with(P.not(null), ({ version, steps }) => [
                         Lens.fromProp<LoadedModel>()("areStepsInFlight").set(
-                          true
+                          true,
                         )(loadedModel),
                         sendSteps(convex, loadedModel, version, steps),
                       ])
-                      .exhaustive()
+                      .exhaustive(),
                   )
-                  .exhaustive()
+                  .exhaustive(),
               )
               .with({ _tag: "StepsSent" }, () =>
                 match<
@@ -359,35 +363,35 @@ export const update =
                 >(collab.sendableSteps(loadedModel.editor.state))
                   .with(null, () => [
                     Lens.fromProp<LoadedModel>()("areStepsInFlight").set(false)(
-                      loadedModel
+                      loadedModel,
                     ),
                     cmd.none,
                   ])
                   .with(P.not(null), ({ version, steps }) => [
                     Lens.fromProp<LoadedModel>()("areStepsInFlight").set(true)(
-                      loadedModel
+                      loadedModel,
                     ),
                     sendSteps(convex, loadedModel, version, steps),
                   ])
-                  .exhaustive()
+                  .exhaustive(),
               )
               .with({ _tag: "StepsReceived" }, ({ steps }) => [
                 loadedModel,
                 receiveSteps(loadedModel.editor, steps),
               ])
-              .exhaustive()
-          )
+              .exhaustive(),
+          ),
       )
       .otherwise(() => [
         model,
         logMessage.report(stage)(
-          logMessage.error("Mismatched model with msg", { model, msg })
+          logMessage.error("Mismatched model with msg", { model, msg }),
         ),
       ]);
 
 const receiveSteps: (
   editor: Editor,
-  steps: NonEmptyArray<{ proseMirrorStep: string; clientId: string }>
+  steps: NonEmptyArray<{ proseMirrorStep: string; clientId: string }>,
 ) => Cmd<never> = (editor, steps_) => {
   const { steps, clientIds } = nonEmptyArray.reduce<
     { proseMirrorStep: string; clientId: string },
@@ -405,27 +409,30 @@ const receiveSteps: (
       editor.view.dispatch(
         collab.receiveTransaction(editor.state, steps, clientIds, {
           mapSelectionBackward: true,
-        })
+        }),
       ),
-    cmdExtra.fromIOVoid
+    cmdExtra.fromIOVoid,
   );
 };
 
 const sendSteps = (
-  convex: ConvexReactClient<API>,
+  convex: ConvexReactClient,
   loadedModel: LoadedModel,
   version: number,
-  steps: ReadonlyArray<Step>
+  steps: ReadonlyArray<Step>,
 ): Cmd<LoadedMsg> =>
   runMutation(
-    convex.mutation("sendSteps"),
+    convex,
+    api.sendSteps.default,
     () => option.some<LoadedMsg>({ _tag: "StepsSent" }),
-    loadedModel.noteId,
-    loadedModel.clientId,
-    version,
-    readonlyArray
-      .toArray(steps)
-      .map((step: Step) => JSON.stringify(step.toJSON()))
+    {
+      noteId: loadedModel.noteId,
+      clientId: loadedModel.clientId,
+      clientPersistedVersion: version,
+      steps: readonlyArray
+        .toArray(steps)
+        .map((step: Step) => JSON.stringify(step.toJSON())),
+    },
   );
 
 // VIEW
@@ -437,7 +444,7 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
         { _tag: "LoadingNoteAndClientId", noteId: P.select() },
         (noteId_) => (
           <LoadingNoteAndClientId dispatch={dispatch_} noteId={noteId_} />
-        )
+        ),
       )
       .with({ _tag: "LoadingEditor" }, { _tag: "Loaded" }, (model_) => (
         <LoadingEditorOrLoaded
@@ -458,7 +465,7 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
                 initialProseMirrorDoc: versionedNote_.proseMirrorDoc,
                 initialVersion: versionedNote_.version,
                 clientId: clientId,
-              })
+              }),
             )
             .with(
               { _tag: "Loaded" },
@@ -476,7 +483,7 @@ export const view: (currentTime: number) => (model: Model) => Html<Msg> =
                 initialProseMirrorDoc,
                 initialVersion,
                 clientId,
-              })
+              }),
             )
             .exhaustive()}
         />
@@ -491,7 +498,7 @@ const LoadingNoteAndClientId = ({
   noteId: Id<"notes">;
 }) => {
   const optionVersionedNote = option.fromNullable(
-    useQuery("getVersionedNote", noteId_)
+    useQuery(api.getVersionedNote.default, { noteId: noteId_ }),
   );
 
   useStableEffect(
@@ -505,12 +512,12 @@ const LoadingNoteAndClientId = ({
               _tag: "VersionedNoteReceived",
               versionedNote: versionedNote_,
             },
-          })
+          }),
         )
         .exhaustive();
     },
     [optionVersionedNote, dispatch_],
-    eq.tuple(option.getEq(versionedNote.Eq), dispatch.getEq<Msg>())
+    eq.tuple(option.getEq(versionedNote.Eq), dispatch.getEq<Msg>()),
   );
 
   return null;
@@ -585,14 +592,17 @@ const LoadingEditorOrLoaded = ({
 
   const currentVersion = match(option.fromNullable(editor))
     .with({ _tag: "Some", value: P.select() }, (editor_) =>
-      collab.getVersion(editor_.state)
+      collab.getVersion(editor_.state),
     )
     .with({ _tag: "None" }, () => initialVersion)
     .exhaustive();
 
-  const stepsSince = useQuery("getStepsSince", noteId_, currentVersion);
+  const stepsSince = useQuery(api.getStepsSince.default, {
+    noteId: noteId_,
+    version: currentVersion,
+  });
 
-  React.useEffect(() => {
+  useEffect(() => {
     pipe(
       stepsSince,
       option.fromNullable,
@@ -607,11 +617,11 @@ const LoadingEditorOrLoaded = ({
                 _tag: "StepsReceived",
                 steps,
               },
-            })
+            }),
           ),
-          option.match(constVoid, (msg) => dispatch_(msg))
-        )
-      )
+          option.match(constVoid, (msg) => dispatch_(msg)),
+        ),
+      ),
     );
   }, [stepsSince, dispatch_]);
 
@@ -638,7 +648,7 @@ const LoadedEditor = ({
   creationTime: number;
   editor: ReactEditor;
 }) => {
-  const componentDidMountRef = React.useRef<HTMLDivElement | null>(null);
+  const componentDidMountRef = useRef<HTMLDivElement | null>(null);
 
   useStableLayoutEffect(
     () =>
@@ -652,7 +662,7 @@ const LoadedEditor = ({
         .with({ _tag: "None" }, constVoid)
         .exhaustive(),
     [dispatch_],
-    eq.tuple(dispatch.getEq<Msg>())
+    eq.tuple(dispatch.getEq<Msg>()),
   );
 
   const { ref: inViewRef, entry } = useInView();
@@ -673,12 +683,12 @@ const LoadedEditor = ({
     eq.tuple(dispatch.getEq<Msg>(), {
       equals: (
         entry1: IntersectionObserverEntry | undefined,
-        entry2: IntersectionObserverEntry | undefined
+        entry2: IntersectionObserverEntry | undefined,
       ) =>
         match<
           [
             IntersectionObserverEntry | undefined,
-            IntersectionObserverEntry | undefined
+            IntersectionObserverEntry | undefined,
           ],
           boolean
         >([entry1, entry2])
@@ -689,13 +699,13 @@ const LoadedEditor = ({
               !entry1_ || !entry2_
                 ? false
                 : entryToIntersectionStatus(entry1_) ===
-                  entryToIntersectionStatus(entry2_)
+                  entryToIntersectionStatus(entry2_),
           )
           .exhaustive(),
-    })
+    }),
   );
 
-  React.useLayoutEffect(
+  useLayoutEffect(
     () => () => {
       const el = componentDidMountRef.current;
 
@@ -703,7 +713,7 @@ const LoadedEditor = ({
         if (entry) {
           match<IntersectionStatus, void>(entryToIntersectionStatus(entry))
             .with("EntirelyAbove", () =>
-              window.scrollBy({ top: -el.offsetHeight })
+              window.scrollBy({ top: -el.offsetHeight }),
             )
             .with("EntirelyBelow", () => constVoid)
             .with("PartiallyOrEntirelyInView", constVoid)
@@ -711,21 +721,21 @@ const LoadedEditor = ({
         }
       }
     },
-    [entry]
+    [entry],
   );
 
   const creationDateTime = DateTime.fromMillis(creationTime_);
 
   const formattedCreationTime = match<Duration, string>(
-    DateTime.fromMillis(currentTime).diff(creationDateTime)
+    DateTime.fromMillis(currentTime).diff(creationDateTime),
   )
     .when(
       (duration) => duration.as("minutes") < 1,
-      () => "a few seconds ago"
+      () => "a few seconds ago",
     )
     .when(
       (duration) => duration.as("weeks") < 4,
-      () => creationDateTime.toRelative() || ""
+      () => creationDateTime.toRelative() || "",
     )
     .otherwise(() =>
       creationDateTime.toLocaleString({
@@ -735,7 +745,7 @@ const LoadedEditor = ({
         weekday: "short",
         hour: "numeric",
         minute: "numeric",
-      })
+      }),
     );
 
   return (
@@ -755,7 +765,7 @@ const LoadedEditor = ({
 };
 
 const entryToIntersectionStatus = (
-  entry: IntersectionObserverEntry
+  entry: IntersectionObserverEntry,
 ): IntersectionStatus =>
   match<boolean, IntersectionStatus>(entry.isIntersecting)
     .with(true, () => "PartiallyOrEntirelyInView")
@@ -763,7 +773,7 @@ const entryToIntersectionStatus = (
       match<boolean, IntersectionStatus>(entry.boundingClientRect.top > 0)
         .with(true, () => "EntirelyBelow")
         .with(false, () => "EntirelyAbove")
-        .exhaustive()
+        .exhaustive(),
     )
     .exhaustive();
 
@@ -774,7 +784,7 @@ const isAboveViewport =
       el.getBoundingClientRect(),
       (rect) =>
         rect.bottom <=
-        (window.innerHeight || document.documentElement.clientHeight)
+        (window.innerHeight || document.documentElement.clientHeight),
     );
 
 // SUBSCRIPTIONS

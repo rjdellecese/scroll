@@ -5,9 +5,9 @@ module.exports = {
   content: ["./src/**/*.{html,ts,tsx}"],
   theme: {
     fontFamily: {
-      sans: ["MulishVariable", ...defaultTheme.fontFamily.sans],
-      serif: ["LoraVariable", ...defaultTheme.fontFamily.serif],
-      mono: ["JetBrains MonoVariable", ...defaultTheme.fontFamily.mono],
+      sans: ["Mulish Variable", ...defaultTheme.fontFamily.sans],
+      serif: ["Lora Variable", ...defaultTheme.fontFamily.serif],
+      mono: ["JetBrains Mono Variable", ...defaultTheme.fontFamily.mono],
     },
     extend: {},
   },

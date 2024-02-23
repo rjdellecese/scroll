@@ -9,7 +9,6 @@ import { flow, pipe } from "fp-ts/function";
 import * as React from "react";
 import { match, P } from "ts-pattern";
 
-import type { API } from "~src/convex/_generated/api";
 import * as home from "~src/elm-ts/app/page/home";
 import * as signIn from "~src/elm-ts/app/page/sign-in";
 import * as signUp from "~src/elm-ts/app/page/sign-up";
@@ -64,7 +63,7 @@ export type Msg =
 // UPDATE
 
 export const update =
-  (stage: Stage, convex: ConvexReactClient<API>) =>
+  (stage: Stage, convex: ConvexReactClient) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
       .with(
@@ -80,13 +79,13 @@ export const update =
             home.update(stage, convex)(homeMsg, homeModel),
             tuple.bimap(
               cmd.map((homeMsg_) => ({ _tag: "GotHomeMsg", msg: homeMsg_ })),
-              (homeModel_) => ({ _tag: "Home", model: homeModel_ })
-            )
-          )
+              (homeModel_) => ({ _tag: "Home", model: homeModel_ }),
+            ),
+          ),
       )
       .with(
         [{ _tag: "RouteChanged", route: P.select() }, P.any],
-        routeToModelCmd
+        routeToModelCmd,
       )
       .otherwise(() => [model, cmd.none]);
 
@@ -100,8 +99,8 @@ export const view =
         { _tag: "Home", model: P.select() },
         flow(
           home.view(currentTime),
-          html.map((homeMsg): Msg => ({ _tag: "GotHomeMsg", msg: homeMsg }))
-        )
+          html.map((homeMsg): Msg => ({ _tag: "GotHomeMsg", msg: homeMsg })),
+        ),
       )
       .with({ _tag: "SignIn" }, () => signIn.view)
       .with({ _tag: "SignUp" }, () => signUp.view)
@@ -113,7 +112,7 @@ const notFoundView: Html<Msg> = () => <div>Page not found!</div>;
 // SUBSCRIPTIONS
 
 export const subscriptions: (model: Model) => Sub<Msg> = (
-  model: Model
+  model: Model,
 ): Sub<Msg> =>
   match<Model, Sub<Msg>>(model)
     .with(
@@ -124,8 +123,8 @@ export const subscriptions: (model: Model) => Sub<Msg> = (
       ({ homeModel }) =>
         pipe(
           home.subscriptions(homeModel),
-          sub.map((homeMsg) => ({ _tag: "GotHomeMsg", msg: homeMsg }))
-        )
+          sub.map((homeMsg) => ({ _tag: "GotHomeMsg", msg: homeMsg })),
+        ),
     )
     .with({ _tag: "SignIn" }, () => sub.none)
     .with({ _tag: "SignUp" }, () => sub.none)

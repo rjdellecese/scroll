@@ -11,7 +11,6 @@ module.exports = {
   },
   plugins: [
     "@typescript-eslint",
-    "fp-ts",
     "simple-import-sort",
     "no-type-assertion",
     "no-relative-import-paths",

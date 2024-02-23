@@ -12,7 +12,7 @@ describe("router", () => {
     fc.assert(
       fc.property(homePathArbitrary(), (pathname: string) => {
         expect(route.fromLocationPathname(pathname)).toEqual({ _tag: "Home" });
-      })
+      }),
     );
   });
   test("parses the sign in route", () => {
@@ -21,7 +21,7 @@ describe("router", () => {
         expect(route.fromLocationPathname(pathname)).toEqual({
           _tag: "SignIn",
         });
-      })
+      }),
     );
   });
   test("parses the sign up route", () => {
@@ -30,7 +30,7 @@ describe("router", () => {
         expect(route.fromLocationPathname(pathname)).toEqual({
           _tag: "SignUp",
         });
-      })
+      }),
     );
   });
   test("fromLocationPathname is the left inverse of toString", () => {
@@ -39,10 +39,10 @@ describe("router", () => {
         routeLessNotFoundArbitrary(),
         (route_: Exclude<Route, NotFound>) => {
           expect(
-            pipe(route_, route.toString, route.fromLocationPathname)
+            pipe(route_, route.toString, route.fromLocationPathname),
           ).toEqual(route_);
-        }
-      )
+        },
+      ),
     );
   });
 });
@@ -53,7 +53,7 @@ const routeLessNotFoundArbitrary: () => Arbitrary<
   fc.oneof(
     fc.constant(route.home),
     fc.constant(route.signIn),
-    fc.constant(route.signUp)
+    fc.constant(route.signUp),
   );
 
 const homePaths: ["", "/"] = ["", "/"];

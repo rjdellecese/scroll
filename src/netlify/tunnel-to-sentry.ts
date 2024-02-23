@@ -24,7 +24,7 @@ const handler: Handler = async (event) =>
   pipe(
     either.Do,
     either.bind("envelope", () =>
-      either.fromNullable("Request body is empty")(event.body)
+      either.fromNullable("Request body is empty")(event.body),
     ),
     either.bind("dsn", ({ envelope }) =>
       pipe(
@@ -34,40 +34,40 @@ const handler: Handler = async (event) =>
           match<boolean, Either<string, string>>(splitEnvelope.length === 1)
             .with(true, () => either.left("No headers in envelope"))
             .with(false, () =>
-              pipe(splitEnvelope, readonlyNonEmptyArray.head, either.right)
+              pipe(splitEnvelope, readonlyNonEmptyArray.head, either.right),
             )
             .exhaustive(),
         either.chain(
           flow(
             json.parse,
-            either.mapLeft((error) => `${error}`)
-          )
+            either.mapLeft((error) => `${error}`),
+          ),
         ),
         either.chain((headers) =>
           match<Json, Either<string, URL>>(headers)
             .with({ dsn: P.select("dsn", P.string) }, ({ dsn }) =>
-              url.parse((error) => `${error}`)(dsn)
+              url.parse((error) => `${error}`)(dsn),
             )
-            .otherwise(() => either.left("Couldn't find dsn header"))
-        )
-      )
+            .otherwise(() => either.left("Couldn't find dsn header")),
+        ),
+      ),
     ),
     either.bind(
       "projectId",
       ({ dsn }): Either<string, string> =>
-        pipe(dsn.pathname, string.replace("/", ""), either.right)
+        pipe(dsn.pathname, string.replace("/", ""), either.right),
     ),
     either.chainFirst(({ dsn }) =>
       match(string.Eq.equals(dsn.hostname, sentryConfig.host))
         .with(true, () => either.right(null))
         .with(false, () => either.left(`Invalid hostname: ${dsn.hostname}`))
-        .exhaustive()
+        .exhaustive(),
     ),
     either.chainFirst(({ projectId }) =>
       match(string.Eq.equals(projectId, sentryConfig.projectId))
         .with(true, () => either.right(null))
         .with(false, () => either.left(`Invalid projectId: ${projectId}`))
-        .exhaustive()
+        .exhaustive(),
     ),
     taskEither.fromEither,
     taskEither.chainW(({ envelope, projectId }) =>
@@ -98,12 +98,12 @@ const handler: Handler = async (event) =>
                     statusCode: response.status,
                     statusText: response.statusText,
                     body,
-                  })
-                )
+                  }),
+                ),
             )
-            .exhaustive()
-        )
-      )
+            .exhaustive(),
+        ),
+      ),
     ),
     taskEither.match(
       (error): Response => {
@@ -111,8 +111,8 @@ const handler: Handler = async (event) =>
         console.error(errorMessage, error);
         return { statusCode: 400, body: errorMessage };
       },
-      (): Response => ({ statusCode: 200 })
-    )
+      (): Response => ({ statusCode: 200 }),
+    ),
   )();
 
 export { handler };

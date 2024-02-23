@@ -44,14 +44,14 @@ export const ap: <A, B>(f: Cmd<(a: A) => B>) => (fa: Cmd<A>) => Cmd<B> =
       .pipe(rxMap(([f_, fa_]) => taskOption.ap(fa_)(f_)));
 
 export const chain: <A, B>(f: (a: A) => Cmd<B>) => (fa: Cmd<A>) => Cmd<B> = (
-  f
+  f,
 ) =>
   rxMergeMap(
     flow(
       taskOption.match(constant(cmd.none), f),
       (taskCmd) => rxjs.defer(taskCmd),
-      rxMergeAll()
-    )
+      rxMergeAll(),
+    ),
   );
 
 // NATURAL TRANSFORMATIONS
@@ -61,7 +61,7 @@ export const fromIO: FromIO1<URI>["fromIO"] = (ma) =>
 
 export const fromTask: FromTask1<URI>["fromTask"] = flow(
   taskOption.fromTask,
-  (taskOption_) => rxjs.of(taskOption_)
+  (taskOption_) => rxjs.of(taskOption_),
 );
 
 // TYPECLASS INSTANCES
@@ -137,17 +137,17 @@ export const ignore: <A>(ma: Cmd<A>) => Cmd<never> = chain(constant(cmd.none));
 
 export const fromOption: <A>(ma: Option<A>) => Cmd<A> = option.match(
   constant(cmd.none),
-  cmd.of
+  cmd.of,
 );
 
 // UTILS
 
 export const fromIOVoid: (ioVoid: IO<void>) => Cmd<never> = flow(
   fromIO,
-  ignore
+  ignore,
 );
 
 // There is a difference, at least for RxJs version 6.x, betweeen setting the scheduler via the `observeOn` operator and setting it as an argument to an `Observable` constructor function. See the following for some more detail: https://indepth.dev/posts/1012/rxjs-applying-asyncscheduler-as-an-argument-vs-with-observeon-operator
 export const scheduleForNextAnimationFrame: <A>(cmd_: Cmd<A>) => Cmd<A> = (
-  cmd_
+  cmd_,
 ) => rxjs.scheduled(cmd_, rxjs.animationFrameScheduler);

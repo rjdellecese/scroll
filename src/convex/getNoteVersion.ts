@@ -3,7 +3,7 @@ import type { DatabaseReader } from "~src/convex/_generated/server";
 
 export default async (
   db: DatabaseReader,
-  noteId: Id<"notes">
+  noteId: Id<"notes">,
 ): Promise<number> => {
   const stepsQuery = db
     .query("steps")

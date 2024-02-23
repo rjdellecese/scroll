@@ -1,5 +1,9 @@
-import type { GenericAPI, MutationNames, NamedMutation } from "convex/browser";
-import type { ReactMutation } from "convex/react";
+import type { ConvexReactClient } from "convex/react";
+import type {
+  FunctionArgs,
+  FunctionReference,
+  FunctionReturnType,
+} from "convex/server";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import { task } from "fp-ts";
 import { pipe } from "fp-ts/function";
@@ -7,16 +11,16 @@ import type { Option } from "fp-ts/lib/Option";
 import * as rxjs from "rxjs";
 
 export const runMutation: <
-  API extends GenericAPI,
-  Name extends MutationNames<API>,
-  Msg
+  FunRef extends FunctionReference<"mutation", "public">,
+  Msg,
 >(
-  reactMutation: ReactMutation<API, Name>,
-  onResponse: (response: ReturnType<NamedMutation<API, Name>>) => Option<Msg>,
-  ...args: Parameters<NamedMutation<API, Name>>
-) => Cmd<Msg> = (reactMutation, onResponse, ...args) =>
+  convex: ConvexReactClient,
+  funRef: FunRef,
+  onResponse: (response: FunctionReturnType<FunRef>) => Option<Msg>,
+  args: FunctionArgs<FunRef>,
+) => Cmd<Msg> = (convex, funRef, onResponse, args) =>
   pipe(
-    () => reactMutation(...args),
+    () => convex.mutation(funRef, args),
     task.map(onResponse),
-    (taskOption) => rxjs.of(taskOption)
+    (taskOption) => rxjs.of(taskOption),
   );
