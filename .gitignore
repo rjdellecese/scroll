@@ -3,3 +3,5 @@ dist/
 .parcel-cache/
 .netlify/
 src/convex/_generated/
+
+.env.local

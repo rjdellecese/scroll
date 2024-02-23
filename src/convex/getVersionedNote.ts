@@ -4,7 +4,10 @@ import getNoteVersion from "~src/convex/getNoteVersion";
 import type { VersionedNote } from "~src/versioned-note";
 
 export default query(
-  async ({ db, auth }, noteId: Id<"notes">): Promise<VersionedNote> => {
+  async (
+    { db, auth },
+    { noteId }: { noteId: Id<"notes"> },
+  ): Promise<VersionedNote> => {
     const userIdentity = await auth.getUserIdentity();
 
     if (userIdentity) {
@@ -25,5 +28,5 @@ export default query(
     } else {
       throw "Unauthenticated";
     }
-  }
+  },
 );

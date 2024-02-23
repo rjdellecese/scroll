@@ -1,5 +1,5 @@
 import { UserButton } from "@clerk/clerk-react";
-import type { ConvexReactClient } from "convex/react";
+import { type ConvexReactClient, useQuery } from "convex/react";
 import { cmd, html, sub } from "elm-ts";
 import type { Cmd } from "elm-ts/lib/Cmd";
 import type { Html } from "elm-ts/lib/React";
@@ -25,9 +25,8 @@ import type { Dispatch, ReactElement } from "react";
 import React from "react";
 import { match, P } from "ts-pattern";
 
-import type { API } from "~src/convex/_generated/api";
+import { api } from "~src/convex/_generated/api";
 import type { Id } from "~src/convex/_generated/dataModel";
-import { useQuery } from "~src/convex/_generated/react";
 import type { DatePaginationCursors } from "~src/date-pagination-cursors";
 import * as cmdExtra from "~src/elm-ts/cmd-extra";
 import { runMutation } from "~src/elm-ts/convex-elm-ts";
@@ -74,7 +73,7 @@ export type Msg =
     };
 
 export const update =
-  (stage: Stage, convex: ConvexReactClient<API>) =>
+  (stage: Stage, convex: ConvexReactClient) =>
   (msg: Msg, model: Model): [Model, Cmd<Msg>] =>
     pipe(
       match<[Msg, Model], [Model, Cmd<Msg>]>([msg, model])
@@ -85,21 +84,24 @@ export const update =
           ],
           (loadedNotesModel) => [
             Lens.fromProp<LoadedNotesModel>()("isNoteBeingCreated").set(true)(
-              loadedNotesModel
+              loadedNotesModel,
             ),
-            runMutation(convex.mutation("createEmptyNote"), () =>
-              option.some({ _tag: "NoteCreated" })
+            runMutation(
+              convex,
+              api.createEmptyNote.default,
+              () => option.some({ _tag: "NoteCreated" }),
+              {},
             ),
-          ]
+          ],
         )
         .with(
           [{ _tag: "NoteCreated" }, P.select({ _tag: "LoadedNotes" })],
           (loadedNotesModel) => [
             Lens.fromProp<LoadedNotesModel>()("isNoteBeingCreated").set(false)(
-              loadedNotesModel
+              loadedNotesModel,
             ),
             cmd.none,
-          ]
+          ],
         )
         .with(
           [
@@ -121,9 +123,9 @@ export const update =
                   isNoteBeingCreated: false,
                   optionDatePaginationCursors: option.none,
                   haveAllNotesLoaded: false,
-                })
-              )
-            )
+                }),
+              ),
+            ),
         )
         .with(
           [
@@ -141,22 +143,22 @@ export const update =
               ],
               ([noteModels, cmd_]: [note.Model[], Cmd<Msg>]): [
                 Model,
-                Cmd<Msg>
+                Cmd<Msg>,
               ] => [
                 pipe(
                   loadedNotesModel,
                   Lens.fromProp<LoadedNotesModel>()("noteModels").set(
-                    noteModels
-                  )
+                    noteModels,
+                  ),
                 ),
                 cmd_,
-              ]
+              ],
             )(
               reconcileNotes(
                 array.reverse(noteIds),
-                loadedNotesModel.noteModels
-              )
-            )
+                loadedNotesModel.noteModels,
+              ),
+            ),
         )
         .with(
           [
@@ -176,21 +178,21 @@ export const update =
                 pipe(
                   loadedNotesModel.noteModels,
                   array.findIndex<note.Model>((noteModel) =>
-                    id.getEq<"notes">().equals(noteId, note.noteId(noteModel))
+                    id.getEq<"notes">().equals(noteId, note.noteId(noteModel)),
                   ),
                   either.fromOption(() =>
-                    logMessage.error("Failed to find note index by ID")
-                  )
-                )
+                    logMessage.error("Failed to find note index by ID"),
+                  ),
+                ),
               ),
               either.bind("noteModel", ({ noteIndex }) =>
                 pipe(
                   loadedNotesModel.noteModels,
                   array.lookup(noteIndex),
                   either.fromOption(() =>
-                    logMessage.error("Failed to find note by index")
-                  )
-                )
+                    logMessage.error("Failed to find note by index"),
+                  ),
+                ),
               ),
               either.chain(({ noteIndex, noteModel }) =>
                 pipe(
@@ -203,43 +205,43 @@ export const update =
                       loadedNotesModel.noteModels,
                       array.updateAt(noteIndex, noteModel_),
                       either.fromOption(() =>
-                        logMessage.error("Failed to update note by index")
+                        logMessage.error("Failed to update note by index"),
                       ),
                       either.map((noteModels): [LoadedNotesModel, Cmd<Msg>] =>
                         pipe(
                           [
                             Lens.fromProp<LoadedNotesModel>()("noteModels").set(
-                              noteModels
+                              noteModels,
                             )(loadedNotesModel),
                             cmd.map(
                               (noteMsg_: note.Msg): Msg => ({
                                 _tag: "GotNoteMsg",
                                 noteId: note.noteId(noteModel),
                                 msg: noteMsg_,
-                              })
+                              }),
                             )(noteCmd),
                           ],
                           ([loadedNotesModel_, cmd_]: [
                             LoadedNotesModel,
-                            Cmd<Msg>
+                            Cmd<Msg>,
                           ]) =>
                             match<boolean, [LoadedNotesModel, Cmd<Msg>]>(
                               option
                                 .getEq(boolean.Eq)
                                 .equals(
                                   note.isInView(noteModel),
-                                  note.isInView(noteModel_)
-                                )
+                                  note.isInView(noteModel_),
+                                ),
                             )
                               .with(true, () => [loadedNotesModel_, cmd_])
                               .with(false, () => {
                                 const areAllNotesLoaded = pipe(
                                   loadedNotesModel_.noteModels,
-                                  array.every(note.isLoaded)
+                                  array.every(note.isLoaded),
                                 );
 
                                 const getDatePaginationCursors = (
-                                  noteModels_: note.Model[]
+                                  noteModels_: note.Model[],
                                 ): Option<DatePaginationCursors> =>
                                   pipe(
                                     noteModels_,
@@ -247,21 +249,21 @@ export const update =
                                       match(note.isInView(noteModel__))
                                         .with(
                                           { _tag: "Some", value: true },
-                                          () => note.creationTime(noteModel__)
+                                          () => note.creationTime(noteModel__),
                                         )
-                                        .otherwise(() => option.none)
+                                        .otherwise(() => option.none),
                                     ),
                                     nonEmptyArray.fromArray,
                                     option.map(
                                       (creationTimesOfNotesInView) => ({
                                         smallerDateCursor: nonEmptyArray.min(
-                                          number.Ord
+                                          number.Ord,
                                         )(creationTimesOfNotesInView),
                                         largerDateCursor: nonEmptyArray.max(
-                                          number.Ord
+                                          number.Ord,
                                         )(creationTimesOfNotesInView),
-                                      })
-                                    )
+                                      }),
+                                    ),
                                   );
 
                                 return match<
@@ -279,64 +281,66 @@ export const update =
                                           pipe(
                                             loadedNotesModel_,
                                             Lens.fromProp<LoadedNotesModel>()(
-                                              "optionDatePaginationCursors"
+                                              "optionDatePaginationCursors",
                                             ).set(
-                                              option.some(datePaginationCursors)
+                                              option.some(
+                                                datePaginationCursors,
+                                              ),
                                             ),
                                             Lens.fromProp<LoadedNotesModel>()(
-                                              "haveAllNotesLoaded"
-                                            ).set(true)
+                                              "haveAllNotesLoaded",
+                                            ).set(true),
                                           ),
                                           match(
-                                            loadedNotesModel_.haveAllNotesLoaded
+                                            loadedNotesModel_.haveAllNotesLoaded,
                                           )
                                             .with(true, () => cmd.none)
                                             .with(false, () =>
                                               cmdExtra.fromIOVoid(() =>
                                                 window.scrollTo(
                                                   0,
-                                                  document.body.scrollHeight
-                                                )
-                                              )
+                                                  document.body.scrollHeight,
+                                                ),
+                                              ),
                                             )
                                             .exhaustive(),
-                                        ]
-                                      )
-                                    )
+                                        ],
+                                      ),
+                                    ),
                                   )
                                   .exhaustive();
                               })
-                              .exhaustive()
-                        )
-                      )
-                    )
-                )
+                              .exhaustive(),
+                        ),
+                      ),
+                    ),
+                ),
               ),
               either.match(
                 (logMessage_: LogMessage) => [
                   loadedNotesModel,
                   logMessage.report(stage)(logMessage_),
                 ],
-                identity
-              )
-            )
+                identity,
+              ),
+            ),
         )
         .otherwise(() => [
           model,
           logMessage.report(stage)(
-            logMessage.error("Failed to match model with msg", { model, msg })
+            logMessage.error("Failed to match model with msg", { model, msg }),
           ),
-        ])
+        ]),
     );
 
 const reconcileNotes = (
   latestNoteIds: Id<"notes">[],
-  currentNoteModels: note.Model[]
+  currentNoteModels: note.Model[],
 ): Either<LogMessage, [note.Model[], Cmd<Msg>]> =>
   pipe(
     latestNoteIds,
     array.difference(id.getEq<"notes">())(
-      array.map(note.noteId)(currentNoteModels)
+      array.map(note.noteId)(currentNoteModels),
     ),
     array.reduce<Id<"notes">, [note.Model[], Cmd<Msg>[]]>(
       [[], []],
@@ -352,12 +356,12 @@ const reconcileNotes = (
                     _tag: "GotNoteMsg",
                     noteId,
                     msg: noteMsg_,
-                  })
-                )(noteCmd)
+                  }),
+                )(noteCmd),
               )(tuple.snd(result)),
-            (noteModel) => array.prepend(noteModel)(tuple.fst(result))
-          )
-        )
+            (noteModel) => array.prepend(noteModel)(tuple.fst(result)),
+          ),
+        ),
     ),
     (newNoteModelCmds) =>
       pipe(
@@ -367,7 +371,7 @@ const reconcileNotes = (
             newNoteModelCmds,
             tuple.fst,
             array.findFirst((noteModel: note.Model): boolean =>
-              id.getEq<"notes">().equals(note.noteId(noteModel), latestNoteId)
+              id.getEq<"notes">().equals(note.noteId(noteModel), latestNoteId),
             ),
             option.match(
               () =>
@@ -376,27 +380,27 @@ const reconcileNotes = (
                   array.findFirst((noteModel: note.Model): boolean =>
                     id
                       .getEq<"notes">()
-                      .equals(note.noteId(noteModel), latestNoteId)
-                  )
+                      .equals(note.noteId(noteModel), latestNoteId),
+                  ),
                 ),
-              (noteModel) => option.some(noteModel)
+              (noteModel) => option.some(noteModel),
             ),
             either.fromOption(() =>
               logMessage.error(
-                "Failed to find a note model corresponding to a given note ID"
-              )
-            )
-          )
+                "Failed to find a note model corresponding to a given note ID",
+              ),
+            ),
+          ),
         ),
         either.map((noteModels) => [
           readonlyArray.toArray(noteModels),
           cmd.batch(tuple.snd(newNoteModelCmds)),
-        ])
-      )
+        ]),
+      ),
   );
 
 const noteIdsToNoteModels = (
-  noteIds: Id<"notes">[]
+  noteIds: Id<"notes">[],
 ): [note.Model[], Cmd<Msg>] =>
   pipe(
     noteIds,
@@ -413,22 +417,23 @@ const noteIdsToNoteModels = (
                   _tag: "GotNoteMsg",
                   noteId: noteId,
                   msg: noteMsg,
-                })
+                }),
               ),
-              (noteCmd) => array.append(noteCmd)(tuple.snd(result))
+              (noteCmd) => array.append(noteCmd)(tuple.snd(result)),
             ),
-            (noteModel) => array.append(noteModel)(tuple.fst(result))
-          )
-        )
+            (noteModel) => array.append(noteModel)(tuple.fst(result)),
+          ),
+        ),
     ),
-    tuple.mapSnd(cmd.batch)
+    tuple.mapSnd(cmd.batch),
   );
 
 // VIEW
 
 export const view: (currentTime: number) => (model: Model) => Html<Msg> =
-  (currentTime) => (model) => (dispatch_) =>
-    <View dispatch={dispatch_} currentTime={currentTime} model={model} />;
+  (currentTime) => (model) => (dispatch_) => (
+    <View dispatch={dispatch_} currentTime={currentTime} model={model} />
+  );
 
 const View = ({
   dispatch: dispatch_,
@@ -443,23 +448,25 @@ const View = ({
     .with({ _tag: "LoadingNotes" }, () => null)
     .with(
       { _tag: "LoadedNotes", optionDatePaginationCursors: P.select() },
-      option.toNullable
+      option.toNullable,
     )
     .exhaustive();
 
-  const noteIds_ = option.fromNullable(useQuery("getNotes", dateCursors));
+  const noteIds_ = option.fromNullable(
+    useQuery(api.getNotes.default, { datePaginationCursors: dateCursors }),
+  );
 
   useStableEffect(
     () => {
       option.match(constVoid, (noteIds__: Id<"notes">[]) =>
-        dispatch_({ _tag: "GotNotes", noteIds: noteIds__ })
+        dispatch_({ _tag: "GotNotes", noteIds: noteIds__ }),
       )(noteIds_);
     },
     [dispatch_, noteIds_],
     eq.tuple(
       dispatch.getEq<Msg>(),
-      option.getEq(array.getEq(id.getEq<"notes">()))
-    )
+      option.getEq(array.getEq(id.getEq<"notes">())),
+    ),
   );
 
   return (
@@ -478,9 +485,9 @@ const View = ({
                     loadedNotes({
                       currentTime,
                       noteModels,
-                    })
-                )
-              )
+                    }),
+                ),
+              ),
             )
             .exhaustive()(dispatch_)}
         </div>
@@ -489,7 +496,7 @@ const View = ({
         .with({ _tag: "LoadingNotes" }, () => null)
         .with(
           { _tag: "LoadedNotes", isNoteBeingCreated: P.select() },
-          (isNoteBeingCreated) => footer({ isNoteBeingCreated })(dispatch_)
+          (isNoteBeingCreated) => footer({ isNoteBeingCreated })(dispatch_),
         )
         .exhaustive()}
     </div>
@@ -508,65 +515,63 @@ const loadedNotes: ({
   noteModels: note.Model[];
 }) => Html<Msg> =
   ({ currentTime, noteModels }) =>
-  (dispatch_) =>
-    (
-      <>
-        <div className="flex flex-col">
-          {pipe(
-            noteModels,
-            array.map((noteModel) => (
-              <React.Fragment key={note.noteId(noteModel).toString()}>
-                {pipe(
-                  noteModel,
-                  note.view(currentTime),
-                  html.map(
-                    (noteMsg): Msg => ({
-                      _tag: "GotNoteMsg",
-                      noteId: note.noteId(noteModel),
-                      msg: noteMsg,
-                    })
-                  ),
-                  apply(dispatch_)
-                )}
-              </React.Fragment>
-            ))
-          )}
-        </div>
-      </>
-    );
+  (dispatch_) => (
+    <>
+      <div className="flex flex-col">
+        {pipe(
+          noteModels,
+          array.map((noteModel) => (
+            <React.Fragment key={note.noteId(noteModel).toString()}>
+              {pipe(
+                noteModel,
+                note.view(currentTime),
+                html.map(
+                  (noteMsg): Msg => ({
+                    _tag: "GotNoteMsg",
+                    noteId: note.noteId(noteModel),
+                    msg: noteMsg,
+                  }),
+                ),
+                apply(dispatch_),
+              )}
+            </React.Fragment>
+          )),
+        )}
+      </div>
+    </>
+  );
 
 const noNotes: Html<Msg> = () => <div className="flex-grow" />;
 
 const footer: (props: { isNoteBeingCreated: boolean }) => Html<Msg> =
   ({ isNoteBeingCreated }) =>
-  (dispatch_) =>
-    (
-      <div
-        id={htmlId.toString(htmlId.footer)}
-        className="sticky flex flex-row justify-center w-full bottom-0 pt-2 pb-4 bg-yellow-50 z-20 border-t border-yellow-300"
-      >
-        <div className="flex flex-row justify-between w-full max-w-3xl px-8">
-          <div className="flex flex-row space-x-2">
-            <FooterButton
-              onClick={() => dispatch_({ _tag: "CreateNoteButtonClicked" })}
-              isDisabled={isNoteBeingCreated}
-            >
-              {isNoteBeingCreated ? <LoadingSpinner /> : <Plus />}
-            </FooterButton>
-            <FooterButton isDisabled={false}>
-              <LucideArrowDown />
-            </FooterButton>
-            <FooterButton isDisabled={false}>
-              <SearchIcon />
-            </FooterButton>
-            <FooterButton isDisabled={false}>
-              <Filter />
-            </FooterButton>
-          </div>
-          <UserButton />
+  (dispatch_) => (
+    <div
+      id={htmlId.toString(htmlId.footer)}
+      className="sticky flex flex-row justify-center w-full bottom-0 pt-2 pb-4 bg-yellow-50 z-20 border-t border-yellow-300"
+    >
+      <div className="flex flex-row justify-between w-full max-w-3xl px-8">
+        <div className="flex flex-row space-x-2">
+          <FooterButton
+            onClick={() => dispatch_({ _tag: "CreateNoteButtonClicked" })}
+            isDisabled={isNoteBeingCreated}
+          >
+            {isNoteBeingCreated ? <LoadingSpinner /> : <Plus />}
+          </FooterButton>
+          <FooterButton isDisabled={false}>
+            <LucideArrowDown />
+          </FooterButton>
+          <FooterButton isDisabled={false}>
+            <SearchIcon />
+          </FooterButton>
+          <FooterButton isDisabled={false}>
+            <Filter />
+          </FooterButton>
         </div>
+        <UserButton />
       </div>
-    );
+    </div>
+  );
 
 type ButtonProps = React.DetailedHTMLProps<
   React.ButtonHTMLAttributes<HTMLButtonElement>,
@@ -609,13 +614,13 @@ export const subscriptions = (model: Model) => {
                   _tag: "GotNoteMsg",
                   noteId: note.noteId(noteModel),
                   msg: editorMsg,
-                })
-              )
-            )
-          )(subs)
+                }),
+              ),
+            ),
+          )(subs),
         ),
-        sub.batch
-      )
+        sub.batch,
+      ),
     )
     .exhaustive();
 };

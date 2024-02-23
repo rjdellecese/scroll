@@ -7,7 +7,7 @@ import type { Id, TableNames } from "~src/convex/_generated/dataModel";
 // TYPECLASS INSTANCES
 
 export const getEq = <TableName extends TableNames>(): Eq<Id<TableName>> => ({
-  equals: (x, y) => x.equals(y),
+  equals: (x, y) => x === y,
 });
 
 export const getOrd = <TableName extends TableNames>(): Ord<Id<TableName>> => ({

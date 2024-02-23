@@ -5,7 +5,9 @@ import type { DatePaginationCursors } from "~src/date-pagination-cursors";
 export default query(
   async (
     { db, auth },
-    datePaginationCursors: DatePaginationCursors | null
+    {
+      datePaginationCursors,
+    }: { datePaginationCursors: DatePaginationCursors | null },
   ): Promise<Id<"notes">[]> =>
     auth.getUserIdentity().then(async (userIdentity) => {
       if (userIdentity) {
@@ -24,13 +26,13 @@ export default query(
                 q.eq(q.field("owner"), userIdentity.tokenIdentifier),
                 q.gte(
                   q.field("_creationTime"),
-                  datePaginationCursors.smallerDateCursor
+                  datePaginationCursors.smallerDateCursor,
                 ),
                 q.lte(
                   q.field("_creationTime"),
-                  datePaginationCursors.largerDateCursor
-                )
-              )
+                  datePaginationCursors.largerDateCursor,
+                ),
+              ),
             )
             .collect()
             .then((notes) => notes.map(({ _id }) => _id));
@@ -43,9 +45,9 @@ export default query(
                 q.eq(q.field("owner"), userIdentity.tokenIdentifier),
                 q.lt(
                   q.field("_creationTime"),
-                  datePaginationCursors.smallerDateCursor
-                )
-              )
+                  datePaginationCursors.smallerDateCursor,
+                ),
+              ),
             )
             .take(10)
             .then((notes) => notes.map(({ _id }) => _id));
@@ -58,9 +60,9 @@ export default query(
                 q.eq(q.field("owner"), userIdentity.tokenIdentifier),
                 q.gt(
                   q.field("_creationTime"),
-                  datePaginationCursors.largerDateCursor
-                )
-              )
+                  datePaginationCursors.largerDateCursor,
+                ),
+              ),
             )
             .take(10)
             .then((notes) => notes.map(({ _id }) => _id).reverse());
@@ -77,5 +79,5 @@ export default query(
       } else {
         throw "Not authenticated";
       }
-    })
+    }),
 );

@@ -9,10 +9,17 @@ import { schema } from "~src/tiptap-schema-extensions";
 export default mutation(
   async (
     { db, auth },
-    noteId: Id<"notes">,
-    clientId: string,
-    clientPersistedVersion: number,
-    steps: string[]
+    {
+      noteId,
+      clientId,
+      clientPersistedVersion,
+      steps,
+    }: {
+      noteId: Id<"notes">;
+      clientId: string;
+      clientPersistedVersion: number;
+      steps: string[];
+    },
   ): Promise<void> => {
     const note = await db.get(noteId);
     const userIdentity = await auth.getUserIdentity();
@@ -50,7 +57,7 @@ export default mutation(
               throw "Failed to apply step";
             }
           },
-          docNode
+          docNode,
         );
 
         await db.patch(note._id, {
@@ -60,5 +67,5 @@ export default mutation(
         throw "Not authenticated";
       }
     }
-  }
+  },
 );

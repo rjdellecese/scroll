@@ -1,8 +1,6 @@
-import "@fontsource/jetbrains-mono/variable.css";
-import "@fontsource/mulish/variable.css";
-import "@fontsource/mulish/variable-italic.css";
-import "@fontsource/lora/variable.css";
-import "@fontsource/lora/variable-italic.css";
+import "@fontsource-variable/jetbrains-mono/index.css";
+import "@fontsource-variable/mulish/index.css";
+import "@fontsource-variable/lora/index.css";
 
 import * as Sentry from "@sentry/browser";
 import { BrowserTracing } from "@sentry/tracing";
@@ -32,7 +30,10 @@ pipe(
       .with(
         { _tag: "Some", value: P.select("stage_", "Development") },
         ({ stage_ }) =>
-          either.right({ stage: stage_, program: programWithDebuggerWithFlags })
+          either.right({
+            stage: stage_,
+            program: programWithDebuggerWithFlags,
+          }),
       )
       .with(
         { _tag: "Some", value: P.select("stage_", "Production") },
@@ -45,17 +46,17 @@ pipe(
           });
 
           return either.right({ stage: stage_, program: programWithFlags });
-        }
+        },
       )
-      .exhaustive()
+      .exhaustive(),
   ),
   either.bind("time", () => either.right(new Date().getTime())),
   either.bind("root", () =>
     pipe(
       document.getElementById("app"),
       either.fromNullable("Failed to find app element"),
-      either.map(createRoot)
-    )
+      either.map(createRoot),
+    ),
   ),
   either.match(
     (errorMessage) => {
@@ -68,16 +69,16 @@ pipe(
           app.init,
           app.update,
           app.view,
-          app.subscriptions
+          app.subscriptions,
         )({ time, stage: stageAndProgram.stage }),
-        (dom) => root.render(dom)
+        (dom) => root.render(dom),
       );
-    }
-  )
+    },
+  ),
 );
 
 // https://parceljs.org/languages/javascript/#service-workers
 navigator.serviceWorker.register(
   new URL("service-worker.ts", import.meta.url),
-  { type: "module" }
+  { type: "module" },
 );
