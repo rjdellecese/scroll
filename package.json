@@ -83,5 +83,8 @@
     "react-intersection-observer": "9.8.1",
     "rxjs": "7.8.1",
     "ts-pattern": "5.0.8"
+  },
+  "optionalDependencies": {
+    "@parcel/watcher-linux-x64-glibc": "^2.4.1"
   }
 }
