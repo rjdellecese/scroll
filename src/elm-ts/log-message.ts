@@ -65,14 +65,14 @@ export function fromValidationErrors(codecErrors: t.Errors): LogMessage {
     codecErrors,
     pathReporter.failure,
     (pathReportorErrors: string[]) =>
-      error("Validation failed", { errors: pathReportorErrors })
+      error("Validation failed", { errors: pathReportorErrors }),
   );
 }
 
 // EFFECTS
 
 export const report: (
-  stage: Stage
+  stage: Stage,
 ) => (logMessage: LogMessage) => Cmd<never> = (stage) =>
   flow(reportIO(stage), cmdExtra.fromIOVoid);
 
@@ -85,7 +85,7 @@ export function reportIO(stage: Stage): (logMessage: LogMessage) => IO<void> {
 
 function reportToSentryIO(logMessage: LogMessage): IO<void> {
   const reportInternalLogMessage: (
-    internalLogMessage: InternalLogMessage
+    internalLogMessage: InternalLogMessage,
   ) => IO<void> = (internalLogMessage) =>
     pipe(
       match(internalLogMessage)
@@ -101,21 +101,21 @@ function reportToSentryIO(logMessage: LogMessage): IO<void> {
                     }
                   : {})(),
               tags: { route: window.location.pathname },
-            })
-          )
+            }),
+          ),
         )
         .with(
           { tag: "Exception", exception: P.select() },
-          (exception_) => () => Sentry.captureException(exception_)
+          (exception_) => () => Sentry.captureException(exception_),
         )
         .exhaustive(),
-      io.map(constVoid)
+      io.map(constVoid),
     );
 
   return pipe(
     logMessage,
     array.map(reportInternalLogMessage),
-    array.reduce(constVoid, (b, a) => io.chain(constant(a))(b))
+    array.reduce(constVoid, (b, a) => io.chain(constant(a))(b)),
   );
 }
 

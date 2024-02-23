@@ -51,6 +51,11 @@ pipe(
       .exhaustive(),
   ),
   either.bind("time", () => either.right(new Date().getTime())),
+  either.bind("convexUrl", () =>
+    either.fromNullable("No 'CONVEX_URL' env var found")(
+      process.env.CONVEX_URL,
+    ),
+  ),
   either.bind("root", () =>
     pipe(
       document.getElementById("app"),
@@ -62,15 +67,20 @@ pipe(
     (errorMessage) => {
       throw new Error(errorMessage);
     },
-    ({ root, time, stageAndProgram }) => {
+    ({
+      root,
+      time,
+      convexUrl,
+      stageAndProgram: { program, stage: stage_ },
+    }) => {
       React.run(
-        stageAndProgram.program(
+        program(
           app.locationToMsg,
           app.init,
           app.update,
           app.view,
           app.subscriptions,
-        )({ time, stage: stageAndProgram.stage }),
+        )({ time, stage: stage_, convexUrl }),
         (dom) => root.render(dom),
       );
     },

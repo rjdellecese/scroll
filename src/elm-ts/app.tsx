@@ -46,7 +46,7 @@ export const init: (
       (pageModel) => ({
         stage: flags.stage,
         currentTime: flags.time,
-        convex: new ConvexReactClient(process.env["CONVEX_URL"]!),
+        convex: new ConvexReactClient(flags.convexUrl),
         page: pageModel,
         areFontsLoaded: false,
       }),

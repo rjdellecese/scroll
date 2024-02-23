@@ -16,6 +16,7 @@
     "@parcel/transformer-webmanifest": "^2.11.0",
     "@parcel/validator-typescript": "^2.11.0",
     "@tsconfig/recommended": "^1.0.3",
+    "@tsconfig/strictest": "^2.0.3",
     "@types/jest": "^29.5.12",
     "@types/luxon": "^3.4.2",
     "@types/node": "^20.11.20",

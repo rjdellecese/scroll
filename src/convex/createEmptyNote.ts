@@ -8,7 +8,7 @@ export default mutation(async ({ db, auth }): Promise<void> => {
 
   if (userIdentity) {
     const proseMirrorDoc = JSON.stringify(
-      EditorState.create({ schema }).doc.toJSON()
+      EditorState.create({ schema }).doc.toJSON(),
     );
 
     await db.insert("notes", {
