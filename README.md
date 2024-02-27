@@ -17,8 +17,6 @@ Of primary interest to you will be:
 
 The Convex functions are written in "normal" TypeScript, but the frontend code (e.g. `note.tsx`) heavily utilizes a functional programming library ([`fp-ts`](https://github.com/gcanti/fp-ts)) and state management library ([`elm-ts`](https://github.com/rjdellecese/elm-ts)) and so is probably going to be harder for most people to grok. I'd just recommend starting with the Convex directory, as ProseMirror OT is basically the only thing going on in there. `note.tsx` is where the client-side stuff happens—look [there](https://github.com/rjdellecese/scroll/blob/fe3ac33935ef03b7ddf3b14d1f991cf632ffc515/src/elm-ts/note.tsx#L23C14-L23C14) for uses of collab and `useQuery`/`useMutation`.
 
-This project uses an old (pre-v1.0) version of Convex, but should still be easy enough to understand—just keep in mind that some details of the Convex API might not correspond one-to-one with what you see here.
-
 ### Technical Notes and Limitations
 
 This implementation should work beautifully at a relatively small scale (a few users editing the documenting simultaneously should be buttery smooth), but at a certain load performance will begin to degrade. This is a known problem with OT algorithms. But for the vast majority of collaborative editing use cases this should be more than sufficient.
