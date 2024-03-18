@@ -54,7 +54,7 @@
     "@fontsource-variable/lora": "^5.0.14",
     "@fontsource-variable/mulish": "^5.0.17",
     "@netlify/functions": "2.6.0",
-    "@sentry/browser": "7.102.1",
+    "@sentry/browser": "7.107.0",
     "@sentry/tracing": "7.102.1",
     "@tiptap/core": "^2.2.4",
     "@tiptap/extension-link": "^2.2.4",
