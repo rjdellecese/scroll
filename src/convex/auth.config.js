@@ -5,7 +5,7 @@ export default {
       applicationID: "convex",
     },
     {
-      domain: "https://clerk.scroll.ink/",
+      domain: "https://clerk.scroll.boats/",
       applicationID: "convex",
     },
   ],
