@@ -1,6 +1,6 @@
 # Scroll
 
-[📜 scroll.ink](https://scroll.ink)
+[📜 Live Demo 📜](https://scroll.boats)
 
 Scroll is a prototype of an infinite-scrolling note-taking app, built on [Convex](https://www.convex.dev/) with ProseMirror. Collaborative editing is supported via [ProseMirror's collab module](https://prosemirror.net/docs/ref/#collab) (which employs Operational Transformation, or OT), and its implementation is based on [this example implementation in the ProseMirror guide](https://prosemirror.net/docs/guide/#collab).
 
